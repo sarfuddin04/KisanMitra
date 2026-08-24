@@ -6,13 +6,14 @@ import datetime
 
 from app.core.database import get_db
 from app.core.deps import require_admin
+from app.core.security import hash_password
 from app.models.user import User, Role, UserProfile
 from app.models.agronomy import Crop, Fertilizer, Disease, CropRecommendation, DiseasePrediction, FertilizerRecommendation
 from app.models.market import Market, MarketPrice
 from app.models.marketplace import Product, ProductCategory, Order, OrderItem
 from app.models.content import FarmingTip, Notification, Banner, FAQ, ContactMessage, SystemSetting, AuditLog
 
-from app.schemas.auth import UserOut
+from app.schemas.auth import UserOut, AdminCreateUser
 from app.schemas.agronomy import (
     CropOut, CropCreate, CropUpdate,
     FertilizerOut, FertilizerCreate, FertilizerUpdate,
@@ -114,6 +115,87 @@ def list_users(search: Optional[str] = Query(None), db: Session = Depends(get_db
             profile=u.profile
         ) for u in users
     ]
+
+@router.post("/users", response_model=UserOut)
+def create_new_admin_or_user(req: AdminCreateUser, db: Session = Depends(get_db)):
+    clean_email = req.email.strip().lower() if req.email else ""
+    clean_phone = req.phone.strip() if (req.phone and req.phone.strip()) else None
+    clean_name = req.full_name.strip() if req.full_name else ""
+
+    if not clean_email:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="A valid email address is required."
+        )
+
+    # Check if email exists
+    existing = db.query(User).filter(User.email == clean_email).first()
+    if existing:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="A user with this email address already exists."
+        )
+
+    # Check phone
+    if clean_phone:
+        existing_phone = db.query(User).filter(User.phone == clean_phone).first()
+        if existing_phone:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="A user with this phone number already exists."
+            )
+
+    # Resolve role
+    target_role = (req.role_name or "ADMIN").upper()
+    role = db.query(Role).filter(Role.name == target_role).first()
+    if not role:
+        role = Role(name=target_role, description=f"{target_role.capitalize()} user account")
+        db.add(role)
+        db.commit()
+        db.refresh(role)
+
+    try:
+        new_user = User(
+            role_id=role.id,
+            full_name=clean_name,
+            email=clean_email,
+            phone=clean_phone,
+            password_hash=hash_password(req.password),
+            is_active=True,
+            is_verified=True,
+            preferred_language="en"
+        )
+        db.add(new_user)
+        db.commit()
+        db.refresh(new_user)
+
+        # Create Profile
+        profile = UserProfile(
+            user_id=new_user.id,
+            farm_location=req.farm_location.strip() if req.farm_location else "KisanMitra Administration",
+            bio="Administrator Account" if target_role == "ADMIN" else "Registered User"
+        )
+        db.add(profile)
+        db.commit()
+        db.refresh(new_user)
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Failed to create user: {str(e)}"
+        )
+
+    return UserOut(
+        id=new_user.id,
+        full_name=new_user.full_name,
+        email=new_user.email,
+        phone=new_user.phone,
+        role_name=role.name,
+        is_active=new_user.is_active,
+        preferred_language=new_user.preferred_language,
+        created_at=new_user.created_at,
+        profile=new_user.profile
+    )
 
 @router.put("/users/{user_id}/status")
 def toggle_user_status(user_id: int, db: Session = Depends(get_db)):

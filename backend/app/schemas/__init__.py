@@ -1,5 +1,5 @@
 from app.schemas.auth import (
-    Token, TokenData, UserRegister, UserLogin, UserOut, UserProfileOut, UserProfileUpdate, PasswordChange
+    Token, TokenData, UserRegister, UserLogin, UserOut, UserProfileOut, UserProfileUpdate, PasswordChange, AdminCreateUser
 )
 from app.schemas.agronomy import (
     CropCreate, CropUpdate, CropOut,

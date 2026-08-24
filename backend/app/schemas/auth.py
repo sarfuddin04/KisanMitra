@@ -72,3 +72,12 @@ class UserProfileUpdate(BaseModel):
 class PasswordChange(BaseModel):
     current_password: str
     new_password: str = Field(..., min_length=6)
+
+class AdminCreateUser(BaseModel):
+    full_name: str = Field(..., min_length=2, max_length=100)
+    email: EmailStr
+    phone: Optional[str] = None
+    password: str = Field(..., min_length=6)
+    role_name: Optional[str] = "ADMIN"
+    farm_location: Optional[str] = None
+
