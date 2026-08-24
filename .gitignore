@@ -54,3 +54,5 @@ logs/
 # Database
 *.sqlite3
 *.db
+
+frontend/.env.production

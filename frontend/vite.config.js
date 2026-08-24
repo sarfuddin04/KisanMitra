@@ -3,7 +3,7 @@ import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 
 // https://vite.dev/config/
-export default defineConfig({
+export default defineConfig(({ mode }) => ({
   plugins: [
     react(),
     tailwindcss()
@@ -16,5 +16,9 @@ export default defineConfig({
         changeOrigin: true
       }
     }
+  },
+  // In production build, use VITE_API_URL env variable
+  define: {
+    __API_URL__: JSON.stringify(process.env.VITE_API_URL || '')
   }
-})
+}))
