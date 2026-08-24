@@ -26,7 +26,19 @@ export const Login = () => {
         navigate('/dashboard');
       }
     } catch (err) {
-      setError(err.response?.data?.detail || 'Invalid email or password. Please try again.');
+      console.error('Login error:', err);
+      const detail = err.response?.data?.detail;
+      let msg = 'Invalid email or password. Please try again.';
+      if (typeof detail === 'string') {
+        msg = detail;
+      } else if (Array.isArray(detail)) {
+        msg = detail.map((d) => d.msg || d.detail || JSON.stringify(d)).join(', ');
+      } else if (detail && typeof detail === 'object') {
+        msg = Object.values(detail).join(', ') || JSON.stringify(detail);
+      } else if (err.message) {
+        msg = err.message;
+      }
+      setError(msg);
     } finally {
       setLoading(false);
     }

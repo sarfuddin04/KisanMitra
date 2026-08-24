@@ -78,19 +78,26 @@ app.include_router(notif_router, prefix=settings.API_V1_STR)
 app.include_router(public_router, prefix=settings.API_V1_STR)
 app.include_router(admin_router, prefix=settings.API_V1_STR)
 
+from app.core.database import get_db_status
+
 @app.get("/")
 def root_endpoint():
     return {
         "platform": settings.PROJECT_NAME,
         "tagline": settings.TAGLINE,
         "status": "Operational",
+        "database": get_db_status(),
         "docs_url": "/docs",
         "api_v1": "/api"
     }
 
 @app.get("/api/health")
 def health_check():
-    return {"status": "healthy", "service": "KisanMitra AI Backend"}
+    return {
+        "status": "healthy",
+        "service": "KisanMitra AI Backend",
+        "database": get_db_status()
+    }
 
 if __name__ == "__main__":
     import uvicorn

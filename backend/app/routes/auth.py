@@ -10,21 +10,31 @@ router = APIRouter(prefix="/auth", tags=["Authentication"])
 
 @router.post("/register", response_model=Token)
 def register_user(req: UserRegister, db: Session = Depends(get_db)):
+    clean_email = req.email.strip().lower() if req.email else ""
+    clean_phone = req.phone.strip() if (req.phone and req.phone.strip()) else None
+    clean_name = req.full_name.strip() if req.full_name else ""
+
+    if not clean_email:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="A valid email address is required."
+        )
+
     # Check if email exists
-    existing = db.query(User).filter(User.email == req.email.lower()).first()
+    existing = db.query(User).filter(User.email == clean_email).first()
     if existing:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="A user with this email address already exists."
+            detail="A user with this email address already exists. Please sign in or use a different email."
         )
     
-    # Check phone
-    if req.phone:
-        existing_phone = db.query(User).filter(User.phone == req.phone).first()
+    # Check phone if provided
+    if clean_phone:
+        existing_phone = db.query(User).filter(User.phone == clean_phone).first()
         if existing_phone:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="A user with this phone number already exists."
+                detail="A user with this mobile number already exists. Please use a different phone number."
             )
             
     # Resolve role
@@ -32,30 +42,42 @@ def register_user(req: UserRegister, db: Session = Depends(get_db)):
     role = db.query(Role).filter(Role.name == role_name).first()
     if not role:
         role = db.query(Role).filter(Role.name == "FARMER").first()
+    if not role:
+        # Create default FARMER role if missing
+        role = Role(name="FARMER", description="Farmer / Producer")
+        db.add(role)
+        db.commit()
+        db.refresh(role)
         
-    new_user = User(
-        role_id=role.id,
-        full_name=req.full_name,
-        email=req.email.lower(),
-        phone=req.phone,
-        password_hash=hash_password(req.password),
-        is_active=True,
-        is_verified=True,
-        preferred_language=req.preferred_language or "en"
-    )
-    db.add(new_user)
-    db.commit()
-    db.refresh(new_user)
-    
-    # Create profile
-    profile = UserProfile(
-        user_id=new_user.id,
-        farm_location=req.farm_location,
-        farm_size_acres=req.farm_size or 1.0,
-        preferred_language=req.preferred_language or "en"
-    )
-    db.add(profile)
-    db.commit()
+    try:
+        new_user = User(
+            role_id=role.id,
+            full_name=clean_name,
+            email=clean_email,
+            phone=clean_phone,
+            password_hash=hash_password(req.password),
+            is_active=True,
+            is_verified=True,
+            preferred_language=req.preferred_language or "en"
+        )
+        db.add(new_user)
+        db.commit()
+        db.refresh(new_user)
+        
+        # Create profile
+        profile = UserProfile(
+            user_id=new_user.id,
+            farm_location=req.farm_location.strip() if req.farm_location else None,
+            farm_size_acres=req.farm_size or 1.0
+        )
+        db.add(profile)
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Registration failed: {str(e)}"
+        )
     
     # Generate Token
     token = create_access_token(subject=new_user.id, role=role.name)

@@ -26,17 +26,47 @@ export const Register = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (formData.password !== formData.confirm_password) {
-      setError('Passwords do not match.');
+    setError('');
+
+    if (formData.password.length < 6) {
+      setError('Password must be at least 6 characters long.');
       return;
     }
+
+    if (formData.password !== formData.confirm_password) {
+      setError('Passwords do not match. Please re-enter your password.');
+      return;
+    }
+
+    const payload = {
+      ...formData,
+      full_name: formData.full_name.trim(),
+      email: formData.email.trim().toLowerCase(),
+      phone: formData.phone.trim() || undefined,
+      farm_location: formData.farm_location.trim(),
+      farm_size: Number(formData.farm_size) || 1.0
+    };
+
     setLoading(true);
-    setError('');
     try {
-      await register(formData);
+      await register(payload);
       navigate('/dashboard');
     } catch (err) {
-      setError(err.response?.data?.detail || 'Registration failed. Please verify the form and try again.');
+      console.error('Registration error:', err);
+      const detail = err.response?.data?.detail;
+      let msg = 'Registration failed. Please check your details and try again.';
+      
+      if (typeof detail === 'string') {
+        msg = detail;
+      } else if (Array.isArray(detail)) {
+        msg = detail.map((d) => d.msg || d.detail || JSON.stringify(d)).join(', ');
+      } else if (detail && typeof detail === 'object') {
+        msg = Object.values(detail).join(', ') || JSON.stringify(detail);
+      } else if (err.message) {
+        msg = err.message;
+      }
+      
+      setError(msg);
     } finally {
       setLoading(false);
     }
@@ -81,16 +111,15 @@ export const Register = () => {
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-gray-700 mb-1">Mobile Phone Number *</label>
+              <label className="block text-xs font-bold text-gray-700 mb-1">Mobile Phone Number</label>
               <div className="relative">
                 <Phone className="w-4 h-4 text-gray-400 absolute left-3.5 top-3" />
                 <input
                   type="tel"
-                  required
                   value={formData.phone}
                   onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                   className="w-full pl-10 pr-3.5 py-2.5 rounded-xl border border-gray-300 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-hidden"
-                  placeholder="9876543210"
+                  placeholder="e.g. 9811002233"
                 />
               </div>
             </div>

@@ -25,7 +25,19 @@ export const AdminLogin = () => {
         setError("Access denied: You do not have administrative privileges.");
       }
     } catch (err) {
-      setError(err.response?.data?.detail || 'Invalid administrative credentials.');
+      console.error('Admin login error:', err);
+      const detail = err.response?.data?.detail;
+      let msg = 'Invalid administrative credentials.';
+      if (typeof detail === 'string') {
+        msg = detail;
+      } else if (Array.isArray(detail)) {
+        msg = detail.map((d) => d.msg || d.detail || JSON.stringify(d)).join(', ');
+      } else if (detail && typeof detail === 'object') {
+        msg = Object.values(detail).join(', ') || JSON.stringify(detail);
+      } else if (err.message) {
+        msg = err.message;
+      }
+      setError(msg);
     } finally {
       setLoading(false);
     }
