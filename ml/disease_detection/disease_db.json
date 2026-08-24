@@ -1,0 +1,203 @@
+{
+  "diseases": [
+    {
+      "id": "tomato_early_blight",
+      "name": "Tomato Early Blight",
+      "scientific_name": "Alternaria solani",
+      "crop": "Tomato",
+      "type": "Fungal",
+      "severity": "Moderate to High",
+      "symptoms": "Dark brown to black spots with concentric rings resembling a target board, primarily on older lower leaves. Leaves turn yellow and drop prematurely.",
+      "causes": "Warm temperatures (24-30°C) with high humidity, frequent rainfall, or overhead irrigation.",
+      "prevention": [
+        "Use certified disease-free seeds and resistant tomato varieties.",
+        "Practice 3-year crop rotation avoiding Solanaceae family (potato, eggplant, pepper).",
+        "Maintain adequate plant spacing (60 cm) for air circulation.",
+        "Water at the base of the plant using drip irrigation to avoid wetting foliage."
+      ],
+      "treatment": [
+        "Organic: Apply copper-based fungicides or Bacillus subtilis spray every 7-10 days.",
+        "Chemical: Apply Mancozeb 75% WP (2 g/L) or Chlorothalonil 75% WP (2 g/L) at first appearance of spots.",
+        "Remove and safely destroy infected lower leaves (do not compost)."
+      ]
+    },
+    {
+      "id": "tomato_late_blight",
+      "name": "Tomato Late Blight",
+      "scientific_name": "Phytophthora infestans",
+      "crop": "Tomato",
+      "type": "Oomycete / Fungal-like",
+      "severity": "Critical / High",
+      "symptoms": "Large, irregular water-soaked pale to dark lesions on leaves, white velvety fungal growth on undersides during wet weather. Stems develop dark greasy lesions.",
+      "causes": "Cool, humid weather (15-22°C) with prolonged leaf wetness (fog, heavy dew, rain).",
+      "prevention": [
+        "Destroy cull piles and volunteer tomato/potato plants before planting.",
+        "Ensure excellent field drainage and avoid overhead sprinkler irrigation.",
+        "Mulch around plant bases to prevent soil splash onto lower stems."
+      ],
+      "treatment": [
+        "Organic: Copper oxychloride 50% WP (3 g/L) as a protective barrier spray.",
+        "Chemical: Metalaxyl + Mancozeb (Ridomil MZ 2 g/L) or Cymoxanil + Mancozeb (Sectotin 2 g/L).",
+        "Immediately rogue out severely infected plants to prevent rapid field epidemic."
+      ]
+    },
+    {
+      "id": "potato_early_blight",
+      "name": "Potato Early Blight",
+      "scientific_name": "Alternaria solani",
+      "crop": "Potato",
+      "type": "Fungal",
+      "severity": "Moderate",
+      "symptoms": "Small brown concentric ring spots on mature leaves, leaf blighting and premature tuber senescence.",
+      "causes": "Alternating wet and dry periods, stressed plants with low nitrogen.",
+      "prevention": [
+        "Maintain balanced fertilization with adequate nitrogen and potassium.",
+        "Use certified disease-free seed tubers.",
+        "Eliminate solanaceous weed hosts (black nightshade)."
+      ],
+      "treatment": [
+        "Spray Mancozeb 75% WP (2.5 g/L) or Azoxystrobin 23% SC (1 ml/L).",
+        "Apply Trichoderma viride bio-fungicide during vegetative stage."
+      ]
+    },
+    {
+      "id": "potato_late_blight",
+      "name": "Potato Late Blight",
+      "scientific_name": "Phytophthora infestans",
+      "crop": "Potato",
+      "type": "Oomycete",
+      "severity": "Critical",
+      "symptoms": "Rapidly expanding water-soaked necrotic patches with light green halo. Tubers develop granular reddish-brown dry rot.",
+      "causes": "Relative humidity >90% and temperature between 10-20°C.",
+      "prevention": [
+        "Plant certified resistant varieties (e.g. Kufri Girdhari, Kufri Himalini).",
+        "Hill up soil well over developing tubers to prevent spore washdown."
+      ],
+      "treatment": [
+        "Prophylactic spray of Mancozeb 75% WP (2.5 kg/ha).",
+        "Curative spray of Dimethomorph 50% WP (1 g/L) + Mancozeb (2 g/L)."
+      ]
+    },
+    {
+      "id": "rice_leaf_blast",
+      "name": "Rice Blast Disease",
+      "scientific_name": "Magnaporthe oryzae",
+      "crop": "Rice",
+      "type": "Fungal",
+      "severity": "High",
+      "symptoms": "Spindle-shaped elliptical lesions with grayish center and dark reddish-brown margin on leaf blades and neck nodes.",
+      "causes": "High nitrogen fertilizer application, cloudy skies, prolonged dew periods.",
+      "prevention": [
+        "Avoid excessive nitrogen fertilizer application; apply in split doses.",
+        "Maintain proper water level (2-5 cm) in paddy fields.",
+        "Treat seeds with Carbendazim 50% WP @ 2 g/kg seed before sowing."
+      ],
+      "treatment": [
+        "Spray Tricyclazole 75% WP @ 0.6 g/L or Isoprothiolane 40% EC @ 1.5 ml/L.",
+        "Spray Kasugamycin 3% SL @ 2.5 ml/L for organic and bio-management."
+      ]
+    },
+    {
+      "id": "rice_brown_spot",
+      "name": "Rice Brown Spot",
+      "scientific_name": "Bipolaris oryzae",
+      "crop": "Rice",
+      "type": "Fungal",
+      "severity": "Moderate",
+      "symptoms": "Numerous small circular to oval brown spots with yellow halo all over the leaf blade and grain glumes.",
+      "causes": "Nutrient-deficient soils (especially low Potassium and Silicon), drought stress.",
+      "prevention": [
+        "Apply recommended dose of Potash (MOP) and Zinc sulphate.",
+        "Seed treatment with Pseudomonas fluorescens @ 10 g/kg seed."
+      ],
+      "treatment": [
+        "Foliar spray of Propiconazole 25% EC (1 ml/L) or Hexaconazole 5% EC (2 ml/L)."
+      ]
+    },
+    {
+      "id": "wheat_yellow_rust",
+      "name": "Wheat Yellow / Stripe Rust",
+      "scientific_name": "Puccinia striiformis",
+      "crop": "Wheat",
+      "type": "Fungal",
+      "severity": "High",
+      "symptoms": "Yellow to orange-yellow powdery pustules arranged in narrow distinct stripes along leaf veins.",
+      "causes": "Cool and moist weather (10-15°C) with morning dew.",
+      "prevention": [
+        "Cultivate rust-resistant varieties like DBW 187, DBW 222, HD 3086.",
+        "Timely sowing in November to avoid late-season rust build-up."
+      ],
+      "treatment": [
+        "Foliar spray of Tebuconazole 25.9% EC (1.25 ml/L) or Propiconazole 25% EC (1 ml/L)."
+      ]
+    },
+    {
+      "id": "cotton_bacterial_blight",
+      "name": "Cotton Bacterial Blight / Angular Leaf Spot",
+      "scientific_name": "Xanthomonas citri pv. malvacearum",
+      "crop": "Cotton",
+      "type": "Bacterial",
+      "severity": "Moderate to High",
+      "symptoms": "Angular water-soaked spots bounded by leaf veinlets, black arm lesions on branches, water-soaked boll spots.",
+      "causes": "High humidity (85%) and temperature (28-35°C), wind-driven rain.",
+      "prevention": [
+        "Acid delinting of cotton seeds with commercial sulphuric acid (100 ml/kg seed).",
+        "Destroy cotton stubble and crop residues after harvest."
+      ],
+      "treatment": [
+        "Spray Streptocycline (100 mg/L) + Copper Oxychloride (2.5 g/L) at 15-day intervals."
+      ]
+    },
+    {
+      "id": "citrus_canker",
+      "name": "Citrus Canker",
+      "scientific_name": "Xanthomonas axonopodis pv. citri",
+      "crop": "Citrus / Orange / Lemon",
+      "type": "Bacterial",
+      "severity": "High",
+      "symptoms": "Raised corky, crater-like lesions surrounded by an oily yellow halo on leaves, twigs, and fruit peel.",
+      "causes": "Warm, wet weather, leaf miner injuries providing entry wounds.",
+      "prevention": [
+        "Prune and burn infected shoots during winter before spring flush.",
+        "Control citrus leaf miners with Neem oil or Imidacloprid to prevent entry wounds."
+      ],
+      "treatment": [
+        "Spray Bordeaux mixture 1% or Copper Oxychloride 50% WP (3 g/L) + Streptocycline (1 g / 10 L)."
+      ]
+    },
+    {
+      "id": "grape_black_rot",
+      "name": "Grape Black Rot",
+      "scientific_name": "Guignardia bidwellii",
+      "crop": "Grapes",
+      "type": "Fungal",
+      "severity": "High",
+      "symptoms": "Small reddish-brown circular spots on leaves; berries shrivel into hard, black, wrinkled mummies.",
+      "causes": "Warm, humid conditions with free moisture on foliage for 6-24 hours.",
+      "prevention": [
+        "Canopy management for maximum sunlight penetration and aeration.",
+        "Remove mummified berries and infected canes during dormant pruning."
+      ],
+      "treatment": [
+        "Spray Myclobutanil 10% WP or Mancozeb 75% WP before bloom and fruit set."
+      ]
+    },
+    {
+      "id": "healthy_crop",
+      "name": "Healthy Foliage (No Disease Detected)",
+      "scientific_name": "Healthy Plant Tissue",
+      "crop": "All Crops",
+      "type": "Healthy",
+      "severity": "None",
+      "symptoms": "Vibrant green uniform pigmentation, intact cell structure, absence of necrosis, chlorosis, lesions, or fungal sporulation.",
+      "causes": "Optimal agronomic management, balanced soil nutrition, and good environmental conditions.",
+      "prevention": [
+        "Continue regular scouting and balanced NPK fertilization.",
+        "Maintain appropriate irrigation scheduling and soil moisture levels."
+      ],
+      "treatment": [
+        "No remedial action needed. Maintain preventative crop health care."
+      ]
+    }
+  ]
+}

@@ -1,0 +1,43 @@
+{
+  "model_name": "Random Forest Crop Recommender",
+  "n_estimators": 100,
+  "accuracy": 0.9939,
+  "precision": 0.994,
+  "recall": 0.9939,
+  "f1_score": 0.9939,
+  "classes_count": 22,
+  "classes": [
+    "Apple",
+    "Banana",
+    "Blackgram",
+    "Chickpea",
+    "Coconut",
+    "Coffee",
+    "Cotton",
+    "Grapes",
+    "Jute",
+    "Kidney Beans",
+    "Lentil",
+    "Maize",
+    "Mango",
+    "Mothbeans",
+    "Mungbean",
+    "Muskmelon",
+    "Orange",
+    "Papaya",
+    "Pigeonpeas",
+    "Pomegranate",
+    "Rice",
+    "Watermelon"
+  ],
+  "sample_count": 3300,
+  "features": [
+    "N",
+    "P",
+    "K",
+    "temperature",
+    "humidity",
+    "ph",
+    "rainfall"
+  ]
+}
