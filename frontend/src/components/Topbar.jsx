@@ -9,13 +9,14 @@ import {
   ChevronDown,
   Shield,
   Search,
-  CheckCircle2
+  CheckCircle2,
+  Menu
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
 import api from '../services/api';
 
-export const Topbar = ({ title, subtitle, isAdmin = false }) => {
+export const Topbar = ({ title, subtitle, isAdmin = false, onMenuClick = () => {} }) => {
   const { user, logout } = useAuth();
   const { language, setLanguage, t } = useLanguage();
   const navigate = useNavigate();
@@ -53,12 +54,28 @@ export const Topbar = ({ title, subtitle, isAdmin = false }) => {
   };
 
   return (
-    <header className="h-18 bg-white border-b border-gray-100 px-6 flex items-center justify-between sticky top-0 z-30 shadow-xs">
+    <header className="h-16 sm:h-18 bg-white border-b border-gray-100 px-3 sm:px-6 flex items-center justify-between sticky top-0 z-30 shadow-xs">
       
-      {/* Title / Breadcrumb */}
-      <div>
-        <h1 className="text-xl font-bold text-gray-900 tracking-tight">{title || "Farmer Overview"}</h1>
-        {subtitle && <p className="text-xs text-gray-500 font-medium">{subtitle}</p>}
+      {/* Mobile Menu Button + Title */}
+      <div className="flex items-center space-x-2.5 min-w-0 pr-2">
+        <button
+          onClick={onMenuClick}
+          className="p-2 -ml-1 text-slate-600 hover:text-emerald-700 hover:bg-emerald-50 rounded-xl lg:hidden shrink-0"
+          title="Open Menu"
+        >
+          <Menu className="w-5 h-5 sm:w-6 sm:h-6" />
+        </button>
+
+        <div className="min-w-0">
+          <h1 className="text-base sm:text-xl font-bold text-gray-900 tracking-tight truncate leading-tight">
+            {title || "Farmer Overview"}
+          </h1>
+          {subtitle && (
+            <p className="text-[10px] sm:text-xs text-gray-500 font-medium truncate hidden xs:block">
+              {subtitle}
+            </p>
+          )}
+        </div>
       </div>
 
       {/* Right Controls */}

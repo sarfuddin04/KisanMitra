@@ -25,16 +25,23 @@ const adminTitles = {
 export const AdminLayout = () => {
   const location = useLocation();
   const meta = adminTitles[location.pathname] || { title: "Admin Management", subtitle: "Control Panel" };
+  const [mobileSidebarOpen, setMobileSidebarOpen] = React.useState(false);
 
   return (
     <div className="flex h-screen bg-slate-950 text-slate-100 overflow-hidden">
-      <AdminSidebar />
+      <AdminSidebar isOpen={mobileSidebarOpen} onClose={() => setMobileSidebarOpen(false)} />
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden bg-slate-900/50">
-        <Topbar title={meta.title} subtitle={meta.subtitle} isAdmin={true} />
-        <main className="flex-1 overflow-y-auto custom-scrollbar p-6 lg:p-8">
+        <Topbar
+          title={meta.title}
+          subtitle={meta.subtitle}
+          isAdmin={true}
+          onMenuClick={() => setMobileSidebarOpen(true)}
+        />
+        <main className="flex-1 overflow-y-auto custom-scrollbar p-3.5 sm:p-6 lg:p-8">
           <Outlet />
         </main>
       </div>
     </div>
   );
 };
+

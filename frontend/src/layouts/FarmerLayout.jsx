@@ -24,16 +24,23 @@ const pageTitles = {
 export const FarmerLayout = () => {
   const location = useLocation();
   const meta = pageTitles[location.pathname] || { title: "Farmer Portal", subtitle: "Intelligent Agriculture Management" };
+  const [mobileSidebarOpen, setMobileSidebarOpen] = React.useState(false);
 
   return (
     <div className="flex h-screen bg-[#f8faf9] overflow-hidden">
-      <FarmerSidebar />
+      <FarmerSidebar isOpen={mobileSidebarOpen} onClose={() => setMobileSidebarOpen(false)} />
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-        <Topbar title={meta.title} subtitle={meta.subtitle} isAdmin={false} />
-        <main className="flex-1 overflow-y-auto custom-scrollbar p-6 lg:p-8">
+        <Topbar
+          title={meta.title}
+          subtitle={meta.subtitle}
+          isAdmin={false}
+          onMenuClick={() => setMobileSidebarOpen(true)}
+        />
+        <main className="flex-1 overflow-y-auto custom-scrollbar p-3.5 sm:p-6 lg:p-8">
           <Outlet />
         </main>
       </div>
     </div>
   );
 };
+
