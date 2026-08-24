@@ -1,4 +1,4 @@
-﻿services:
+services:
   # FastAPI Backend
   - type: web
     name: kisanmitra-backend
@@ -38,5 +38,4 @@
 databases:
   - name: kisanmitra-db
     databaseName: kisanmitra
-    user: kisanmitra_user
     plan: free
