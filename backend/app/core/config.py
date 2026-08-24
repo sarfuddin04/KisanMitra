@@ -21,7 +21,7 @@ class Settings(BaseSettings):
     # Database: Default to PostgreSQL, with safe fallback handled in database.py
     DATABASE_URL: str = os.getenv(
         "DATABASE_URL",
-        "postgresql+psycopg2://postgres:postgres@localhost:5432/kisanmitra"
+        "postgresql+psycopg2://kisanmitra_user:KisanMitra2026@localhost:5432/kisanmitra"
     )
     
     # External APIs (Configurable via environment)
