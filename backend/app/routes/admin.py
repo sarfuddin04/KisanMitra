@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import func
 from typing import List, Optional, Dict, Any
 import datetime
@@ -9,7 +9,7 @@ from app.core.deps import require_admin
 from app.core.security import hash_password
 from app.models.user import User, Role, UserProfile
 from app.models.agronomy import Crop, Fertilizer, Disease, CropRecommendation, DiseasePrediction, FertilizerRecommendation
-from app.models.market import Market, MarketPrice
+from app.models.market import State, District, Mandi, Market, MarketPrice
 from app.models.marketplace import Product, ProductCategory, Order, OrderItem
 from app.models.content import FarmingTip, Notification, Banner, FAQ, ContactMessage, SystemSetting, AuditLog
 
@@ -19,10 +19,16 @@ from app.schemas.agronomy import (
     FertilizerOut, FertilizerCreate, FertilizerUpdate,
     DiseaseOut, DiseaseCreate, DiseaseUpdate
 )
+from app.schemas.locations import (
+    StateOut, StateCreate, StateUpdate,
+    DistrictOut, DistrictCreate, DistrictUpdate,
+    MandiOut, MandiCreate, MandiUpdate
+)
 from app.schemas.market import (
     MarketOut, MarketCreate, MarketUpdate,
     MarketPriceOut, MarketPriceCreate, MarketPriceUpdate
 )
+from app.routes.market import _price_to_out
 from app.schemas.marketplace import (
     ProductOut, ProductCreate, ProductUpdate,
     ProductCategoryOut, ProductCategoryCreate, ProductCategoryUpdate,
@@ -349,16 +355,48 @@ def delete_tip(tip_id: int, db: Session = Depends(get_db)):
 
 # ==================== 7. MARKET PRICES ====================
 @router.get("/market-prices", response_model=List[MarketPriceOut])
-def get_all_admin_prices(db: Session = Depends(get_db)):
-    return db.query(MarketPrice).order_by(MarketPrice.updated_at.desc()).all()
+def get_all_admin_prices(
+    mandi_id: Optional[int] = Query(None),
+    crop_id: Optional[int] = Query(None),
+    db: Session = Depends(get_db)
+):
+    q = db.query(MarketPrice).options(
+        joinedload(MarketPrice.mandi).joinedload(Mandi.district).joinedload(District.state),
+        joinedload(MarketPrice.crop)
+    )
+    if mandi_id:
+        q = q.filter(MarketPrice.mandi_id == mandi_id)
+    if crop_id:
+        q = q.filter(MarketPrice.crop_id == crop_id)
+    prices = q.order_by(MarketPrice.updated_at.desc()).all()
+    return [_price_to_out(p) for p in prices]
 
 @router.post("/market-prices", response_model=MarketPriceOut)
 def create_market_price(req: MarketPriceCreate, db: Session = Depends(get_db)):
-    p = MarketPrice(**req.dict())
+    data = req.dict()
+    # Auto-populate denormalized flat fields from FK relationships
+    if req.mandi_id:
+        mandi = db.query(Mandi).options(
+            joinedload(Mandi.district).joinedload(District.state)
+        ).filter(Mandi.id == req.mandi_id).first()
+        if mandi:
+            data['market_name'] = data.get('market_name') or mandi.name
+            data['district'] = data.get('district') or (mandi.district.name if mandi.district else None)
+            data['state'] = data.get('state') or (mandi.district.state.name if mandi.district and mandi.district.state else None)
+    if req.crop_id:
+        crop = db.query(Crop).filter(Crop.id == req.crop_id).first()
+        if crop:
+            data['crop_name'] = data.get('crop_name') or crop.name
+    p = MarketPrice(**data)
     db.add(p)
     db.commit()
     db.refresh(p)
-    return p
+    # Reload with joins
+    p = db.query(MarketPrice).options(
+        joinedload(MarketPrice.mandi).joinedload(Mandi.district).joinedload(District.state),
+        joinedload(MarketPrice.crop)
+    ).filter(MarketPrice.id == p.id).first()
+    return _price_to_out(p)
 
 @router.put("/market-prices/{price_id}", response_model=MarketPriceOut)
 def update_market_price(price_id: int, req: MarketPriceUpdate, db: Session = Depends(get_db)):
@@ -368,8 +406,11 @@ def update_market_price(price_id: int, req: MarketPriceUpdate, db: Session = Dep
     for k, v in req.dict(exclude_unset=True).items():
         setattr(p, k, v)
     db.commit()
-    db.refresh(p)
-    return p
+    p = db.query(MarketPrice).options(
+        joinedload(MarketPrice.mandi).joinedload(Mandi.district).joinedload(District.state),
+        joinedload(MarketPrice.crop)
+    ).filter(MarketPrice.id == price_id).first()
+    return _price_to_out(p)
 
 @router.delete("/market-prices/{price_id}")
 def delete_market_price(price_id: int, db: Session = Depends(get_db)):
@@ -630,3 +671,200 @@ def update_setting(key: str, req: SettingUpdate, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(s)
     return s
+
+
+# ==================== 16. LOCATION MANAGEMENT — STATES ====================
+
+@router.get("/states", response_model=List[StateOut])
+def admin_get_all_states(db: Session = Depends(get_db)):
+    return db.query(State).order_by(State.name.asc()).all()
+
+
+@router.post("/states", response_model=StateOut)
+def admin_create_state(req: StateCreate, db: Session = Depends(get_db)):
+    existing = db.query(State).filter(State.name.ilike(req.name.strip())).first()
+    if existing:
+        raise HTTPException(status_code=400, detail=f"State '{req.name}' already exists.")
+    s = State(name=req.name.strip(), is_active=req.is_active)
+    db.add(s)
+    db.commit()
+    db.refresh(s)
+    return s
+
+
+@router.put("/states/{state_id}", response_model=StateOut)
+def admin_update_state(state_id: int, req: StateUpdate, db: Session = Depends(get_db)):
+    s = db.query(State).filter(State.id == state_id).first()
+    if not s:
+        raise HTTPException(status_code=404, detail="State not found.")
+    for k, v in req.dict(exclude_unset=True).items():
+        setattr(s, k, v)
+    db.commit()
+    db.refresh(s)
+    return s
+
+
+@router.delete("/states/{state_id}")
+def admin_delete_state(state_id: int, db: Session = Depends(get_db)):
+    s = db.query(State).filter(State.id == state_id).first()
+    if not s:
+        raise HTTPException(status_code=404, detail="State not found.")
+    db.delete(s)
+    db.commit()
+    return {"message": f"State '{s.name}' deleted successfully."}
+
+
+# ==================== 17. LOCATION MANAGEMENT — DISTRICTS ====================
+
+@router.get("/districts", response_model=List[DistrictOut])
+def admin_get_all_districts(
+    state_id: Optional[int] = Query(None),
+    db: Session = Depends(get_db)
+):
+    q = db.query(District).options(joinedload(District.state))
+    if state_id:
+        q = q.filter(District.state_id == state_id)
+    districts = q.order_by(District.name.asc()).all()
+    return [
+        DistrictOut(
+            id=d.id, state_id=d.state_id, name=d.name, is_active=d.is_active,
+            state_name=d.state.name if d.state else None,
+            created_at=d.created_at, updated_at=d.updated_at
+        ) for d in districts
+    ]
+
+
+@router.post("/districts", response_model=DistrictOut)
+def admin_create_district(req: DistrictCreate, db: Session = Depends(get_db)):
+    state = db.query(State).filter(State.id == req.state_id).first()
+    if not state:
+        raise HTTPException(status_code=404, detail="State not found.")
+    d = District(state_id=req.state_id, name=req.name.strip(), is_active=req.is_active)
+    db.add(d)
+    db.commit()
+    db.refresh(d)
+    d = db.query(District).options(joinedload(District.state)).filter(District.id == d.id).first()
+    return DistrictOut(
+        id=d.id, state_id=d.state_id, name=d.name, is_active=d.is_active,
+        state_name=d.state.name if d.state else None,
+        created_at=d.created_at, updated_at=d.updated_at
+    )
+
+
+@router.put("/districts/{district_id}", response_model=DistrictOut)
+def admin_update_district(district_id: int, req: DistrictUpdate, db: Session = Depends(get_db)):
+    d = db.query(District).filter(District.id == district_id).first()
+    if not d:
+        raise HTTPException(status_code=404, detail="District not found.")
+    for k, v in req.dict(exclude_unset=True).items():
+        setattr(d, k, v)
+    db.commit()
+    d = db.query(District).options(joinedload(District.state)).filter(District.id == district_id).first()
+    return DistrictOut(
+        id=d.id, state_id=d.state_id, name=d.name, is_active=d.is_active,
+        state_name=d.state.name if d.state else None,
+        created_at=d.created_at, updated_at=d.updated_at
+    )
+
+
+@router.delete("/districts/{district_id}")
+def admin_delete_district(district_id: int, db: Session = Depends(get_db)):
+    d = db.query(District).filter(District.id == district_id).first()
+    if not d:
+        raise HTTPException(status_code=404, detail="District not found.")
+    db.delete(d)
+    db.commit()
+    return {"message": f"District '{d.name}' deleted successfully."}
+
+
+# ==================== 18. LOCATION MANAGEMENT — MANDIS ====================
+
+from app.routes.locations import _mandi_to_out
+
+
+@router.get("/mandis", response_model=List[MandiOut])
+def admin_get_all_mandis(
+    district_id: Optional[int] = Query(None),
+    state_id: Optional[int] = Query(None),
+    db: Session = Depends(get_db)
+):
+    q = db.query(Mandi).options(joinedload(Mandi.district).joinedload(District.state))
+    if district_id:
+        q = q.filter(Mandi.district_id == district_id)
+    if state_id:
+        q = q.join(District).filter(District.state_id == state_id)
+    mandis = q.order_by(Mandi.name.asc()).all()
+    return [_mandi_to_out(m) for m in mandis]
+
+
+@router.post("/mandis", response_model=MandiOut)
+def admin_create_mandi(req: MandiCreate, db: Session = Depends(get_db)):
+    district = db.query(District).filter(District.id == req.district_id).first()
+    if not district:
+        raise HTTPException(status_code=404, detail="District not found.")
+    m = Mandi(**req.dict())
+    db.add(m)
+    db.commit()
+    db.refresh(m)
+    m = db.query(Mandi).options(joinedload(Mandi.district).joinedload(District.state)).filter(Mandi.id == m.id).first()
+    return _mandi_to_out(m)
+
+
+@router.put("/mandis/{mandi_id}", response_model=MandiOut)
+def admin_update_mandi(mandi_id: int, req: MandiUpdate, db: Session = Depends(get_db)):
+    m = db.query(Mandi).filter(Mandi.id == mandi_id).first()
+    if not m:
+        raise HTTPException(status_code=404, detail="Mandi not found.")
+    for k, v in req.dict(exclude_unset=True).items():
+        setattr(m, k, v)
+    db.commit()
+    m = db.query(Mandi).options(joinedload(Mandi.district).joinedload(District.state)).filter(Mandi.id == mandi_id).first()
+    return _mandi_to_out(m)
+
+
+@router.delete("/mandis/{mandi_id}")
+def admin_delete_mandi(mandi_id: int, db: Session = Depends(get_db)):
+    m = db.query(Mandi).filter(Mandi.id == mandi_id).first()
+    if not m:
+        raise HTTPException(status_code=404, detail="Mandi not found.")
+    name = m.name
+    db.delete(m)
+    db.commit()
+    return {"message": f"Mandi '{name}' deleted successfully."}
+
+
+@router.put("/mandis/{mandi_id}/image")
+def admin_update_mandi_image(mandi_id: int, image_url: str, db: Session = Depends(get_db)):
+    """Update just the image URL for a mandi (called after /api/upload/image)."""
+    m = db.query(Mandi).filter(Mandi.id == mandi_id).first()
+    if not m:
+        raise HTTPException(status_code=404, detail="Mandi not found.")
+    m.image_url = image_url
+    db.commit()
+    return {"message": "Mandi image updated.", "image_url": image_url}
+
+
+# ==================== 19. CROP IMAGE ====================
+
+@router.put("/crops/{crop_id}/image")
+def admin_update_crop_image(crop_id: int, image_url: str, db: Session = Depends(get_db)):
+    """Update just the image URL for a crop."""
+    crop = db.query(Crop).filter(Crop.id == crop_id).first()
+    if not crop:
+        raise HTTPException(status_code=404, detail="Crop not found.")
+    crop.image_url = image_url
+    db.commit()
+    return {"message": "Crop image updated.", "image_url": image_url}
+
+
+# ==================== 20. FERTILIZER IMAGE ====================
+
+@router.put("/fertilizers/{fert_id}/image")
+def admin_update_fertilizer_image(fert_id: int, image_url: str, db: Session = Depends(get_db)):
+    """Update just the image URL for a fertilizer."""
+    f = db.query(Fertilizer).filter(Fertilizer.id == fert_id).first()
+    if not f:
+        raise HTTPException(status_code=404, detail="Fertilizer not found.")
+    f.image_url = image_url
+    db.commit()
+    return {"message": "Fertilizer image updated.", "image_url": image_url}

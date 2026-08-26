@@ -8,7 +8,7 @@ from app.models.agronomy import (
     DiseasePrediction,
     FertilizerRecommendation
 )
-from app.models.market import Market, MarketPrice, WeatherRecord
+from app.models.market import State, District, Mandi, Market, MarketPrice, WeatherRecord
 from app.models.marketplace import (
     ProductCategory,
     Product,
@@ -41,6 +41,9 @@ __all__ = [
     "CropRecommendation",
     "DiseasePrediction",
     "FertilizerRecommendation",
+    "State",
+    "District",
+    "Mandi",
     "Market",
     "MarketPrice",
     "WeatherRecord",

@@ -51,6 +51,8 @@ app.mount("/api/static", StaticFiles(directory=settings.UPLOAD_DIR), name="stati
 
 from app.routes.auth import router as auth_router
 from app.routes.crops import router as crops_router
+from app.routes.locations import router as locations_router
+from app.routes.upload import router as upload_router
 from app.routes.recommendations import router as rec_router
 from app.routes.disease import router as disease_router
 from app.routes.fertilizer import router as fertilizer_router
@@ -68,6 +70,8 @@ from app.routes.admin import router as admin_router
 # Mount all API routers
 app.include_router(auth_router, prefix=settings.API_V1_STR)
 app.include_router(crops_router, prefix=settings.API_V1_STR)
+app.include_router(locations_router, prefix=settings.API_V1_STR)
+app.include_router(upload_router, prefix=settings.API_V1_STR)
 app.include_router(rec_router, prefix=settings.API_V1_STR)
 
 app.include_router(disease_router, prefix=settings.API_V1_STR)

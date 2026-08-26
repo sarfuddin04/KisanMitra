@@ -25,6 +25,8 @@ class Crop(Base):
     description = Column(Text, nullable=True)
     cultivation_guide = Column(Text, nullable=True)
     image_url = Column(String(255), nullable=True)
+    suitable_soil = Column(String(200), nullable=True)  # e.g. "Loamy, Clay Loam"
+    ph_range = Column(String(50), nullable=True)  # e.g. "6.0-7.5"
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
@@ -46,6 +48,7 @@ class Fertilizer(Base):
     soil_condition_suitability = Column(String(255), nullable=True)
     application_guidance = Column(Text, nullable=True)
     precautions = Column(Text, nullable=True)
+    image_url = Column(String(255), nullable=True)
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)

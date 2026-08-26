@@ -55,21 +55,39 @@ def get_engine():
 from sqlalchemy import text
 
 def sync_schema(eng):
+    """Add any new columns to existing tables that may not exist yet (safe ALTER TABLE)."""
     try:
         with eng.begin() as conn:
             dialect_name = eng.dialect.name
             if dialect_name == "postgresql":
+                # User tables
                 conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS gender VARCHAR(20);"))
                 conn.execute(text("ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS gender VARCHAR(20);"))
+                # Crop enhancements
+                conn.execute(text("ALTER TABLE crops ADD COLUMN IF NOT EXISTS suitable_soil VARCHAR(200);"))
+                conn.execute(text("ALTER TABLE crops ADD COLUMN IF NOT EXISTS ph_range VARCHAR(50);"))
+                # Fertilizer image
+                conn.execute(text("ALTER TABLE fertilizers ADD COLUMN IF NOT EXISTS image_url VARCHAR(255);"))
+                # Market prices hierarchy FKs (nullable, safe)
+                conn.execute(text("ALTER TABLE market_prices ADD COLUMN IF NOT EXISTS mandi_id INTEGER;"))
+                conn.execute(text("ALTER TABLE market_prices ADD COLUMN IF NOT EXISTS crop_id INTEGER;"))
+                conn.execute(text("ALTER TABLE market_prices ADD COLUMN IF NOT EXISTS district VARCHAR(100);"))
+                conn.execute(text("ALTER TABLE market_prices ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT TRUE;"))
             elif dialect_name == "sqlite":
-                res = conn.execute(text("PRAGMA table_info(users);")).fetchall()
-                cols = [r[1] for r in res]
-                if "gender" not in cols:
-                    conn.execute(text("ALTER TABLE users ADD COLUMN gender VARCHAR(20);"))
-                res_prof = conn.execute(text("PRAGMA table_info(user_profiles);")).fetchall()
-                cols_prof = [r[1] for r in res_prof]
-                if "gender" not in cols_prof:
-                    conn.execute(text("ALTER TABLE user_profiles ADD COLUMN gender VARCHAR(20);"))
+                def _add_col_if_missing(table, col, col_def):
+                    res = conn.execute(text(f"PRAGMA table_info({table});")).fetchall()
+                    cols = [r[1] for r in res]
+                    if col not in cols:
+                        conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {col} {col_def};"))
+                _add_col_if_missing("users", "gender", "VARCHAR(20)")
+                _add_col_if_missing("user_profiles", "gender", "VARCHAR(20)")
+                _add_col_if_missing("crops", "suitable_soil", "VARCHAR(200)")
+                _add_col_if_missing("crops", "ph_range", "VARCHAR(50)")
+                _add_col_if_missing("fertilizers", "image_url", "VARCHAR(255)")
+                _add_col_if_missing("market_prices", "mandi_id", "INTEGER")
+                _add_col_if_missing("market_prices", "crop_id", "INTEGER")
+                _add_col_if_missing("market_prices", "district", "VARCHAR(100)")
+                _add_col_if_missing("market_prices", "is_active", "BOOLEAN DEFAULT 1")
     except Exception as e:
         logger.warning(f"Schema sync notice: {e}")
 

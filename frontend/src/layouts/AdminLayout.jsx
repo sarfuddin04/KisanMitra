@@ -19,7 +19,8 @@ const adminTitles = {
   "/admin/banners": { title: "Hero Banners", subtitle: "Customize promotional banners on the homepage" },
   "/admin/faqs": { title: "FAQ Knowledgebase", subtitle: "Manage public frequently asked questions" },
   "/admin/contacts": { title: "Inquiries & Contact Requests", subtitle: "Review farmer messages and inquiries" },
-  "/admin/settings": { title: "System Settings", subtitle: "Configure platform parameters and feature flags" }
+  "/admin/settings": { title: "System Settings", subtitle: "Configure platform parameters and feature flags" },
+  "/admin/locations": { title: "Location Management", subtitle: "Manage States, Districts, and Mandis hierarchy" }
 };
 
 export const AdminLayout = () => {

@@ -22,6 +22,8 @@ class CropBase(BaseModel):
     description: Optional[str] = None
     cultivation_guide: Optional[str] = None
     image_url: Optional[str] = None
+    suitable_soil: Optional[str] = None
+    ph_range: Optional[str] = None
     is_active: Optional[bool] = True
 
 class CropCreate(CropBase):
@@ -46,6 +48,8 @@ class CropUpdate(BaseModel):
     description: Optional[str] = None
     cultivation_guide: Optional[str] = None
     image_url: Optional[str] = None
+    suitable_soil: Optional[str] = None
+    ph_range: Optional[str] = None
     is_active: Optional[bool] = None
 
 class CropOut(CropBase):
@@ -68,6 +72,7 @@ class FertilizerBase(BaseModel):
     soil_condition_suitability: Optional[str] = None
     application_guidance: Optional[str] = None
     precautions: Optional[str] = None
+    image_url: Optional[str] = None
     is_active: Optional[bool] = True
 
 class FertilizerCreate(FertilizerBase):
@@ -84,6 +89,7 @@ class FertilizerUpdate(BaseModel):
     soil_condition_suitability: Optional[str] = None
     application_guidance: Optional[str] = None
     precautions: Optional[str] = None
+    image_url: Optional[str] = None
     is_active: Optional[bool] = None
 
 class FertilizerOut(FertilizerBase):

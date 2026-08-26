@@ -53,6 +53,7 @@ import { AdminBanners } from './pages/admin/AdminBanners';
 import { AdminFAQs } from './pages/admin/AdminFAQs';
 import { AdminContacts } from './pages/admin/AdminContacts';
 import { AdminSettings } from './pages/admin/AdminSettings';
+import { AdminLocations } from './pages/admin/AdminLocations';
 
 // Route Guards
 const FarmerRoute = ({ children }) => {
@@ -145,6 +146,7 @@ export function App() {
         <Route path="/admin/faqs" element={<AdminFAQs />} />
         <Route path="/admin/contacts" element={<AdminContacts />} />
         <Route path="/admin/settings" element={<AdminSettings />} />
+        <Route path="/admin/locations" element={<AdminLocations />} />
       </Route>
 
       {/* Fallback Catch-all */}
