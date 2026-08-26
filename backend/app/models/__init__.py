@@ -8,10 +8,15 @@ from app.models.agronomy import (
     DiseasePrediction,
     FertilizerRecommendation
 )
-from app.models.market import State, District, Mandi, Market, MarketPrice, WeatherRecord
+from app.models.market import (
+    State, District, Mandi, Market,
+    MarketPrice, MarketPriceHistory, PriceSyncLog,
+    WeatherRecord
+)
 from app.models.marketplace import (
     ProductCategory,
     Product,
+    ProductImage,
     Cart,
     CartItem,
     Order,
@@ -31,35 +36,14 @@ from app.models.content import (
 
 __all__ = [
     "Base",
-    "Role",
-    "User",
-    "UserProfile",
-    "UserCrop",
-    "Crop",
-    "Fertilizer",
-    "Disease",
-    "CropRecommendation",
-    "DiseasePrediction",
-    "FertilizerRecommendation",
-    "State",
-    "District",
-    "Mandi",
-    "Market",
-    "MarketPrice",
+    "Role", "User", "UserProfile", "UserCrop",
+    "Crop", "Fertilizer", "Disease",
+    "CropRecommendation", "DiseasePrediction", "FertilizerRecommendation",
+    "State", "District", "Mandi", "Market",
+    "MarketPrice", "MarketPriceHistory", "PriceSyncLog",
     "WeatherRecord",
-    "ProductCategory",
-    "Product",
-    "Cart",
-    "CartItem",
-    "Order",
-    "OrderItem",
-    "Payment",
-    "FarmingTip",
-    "Notification",
-    "Banner",
-    "FAQ",
-    "ContactMessage",
-    "Report",
-    "AuditLog",
-    "SystemSetting"
+    "ProductCategory", "Product", "ProductImage",
+    "Cart", "CartItem", "Order", "OrderItem", "Payment",
+    "FarmingTip", "Notification", "Banner", "FAQ",
+    "ContactMessage", "Report", "AuditLog", "SystemSetting",
 ]

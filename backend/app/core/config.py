@@ -18,15 +18,24 @@ class Settings(BaseSettings):
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 7  # 7 days
     
-    # Database: Default to PostgreSQL, with safe fallback handled in database.py
+    # Database
     DATABASE_URL: str = os.getenv(
         "DATABASE_URL",
         "postgresql+psycopg2://kisanmitra_user:KisanMitra2026@localhost:5432/kisanmitra"
     )
     
-    # External APIs (Configurable via environment)
+    # External APIs
     OPENWEATHER_API_KEY: str = os.getenv("OPENWEATHER_API_KEY", "")
     GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY", "")
+    
+    # Official Market Data API (data.gov.in / AGMARKNET)
+    MARKET_DATA_API_KEY: str = os.getenv("MARKET_DATA_API_KEY", "")
+    MARKET_DATA_SOURCE: str = os.getenv("MARKET_DATA_SOURCE", "data.gov.in")
+    AGMARKNET_RESOURCE_ID: str = os.getenv(
+        "AGMARKNET_RESOURCE_ID", 
+        "9ef84268-d588-465a-a308-a864a43d0070"
+    )
+    MARKET_DATA_BASE_URL: str = "https://api.data.gov.in/resource"
     
     # CORS
     CORS_ORIGINS: List[str] = [
@@ -38,7 +47,10 @@ class Settings(BaseSettings):
     ]
     
     # File Storage
-    UPLOAD_DIR: str = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "storage")
+    UPLOAD_DIR: str = os.path.join(
+        os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
+        "storage"
+    )
 
     class Config:
         case_sensitive = True
@@ -50,3 +62,9 @@ os.makedirs(settings.UPLOAD_DIR, exist_ok=True)
 os.makedirs(os.path.join(settings.UPLOAD_DIR, "leaf_images"), exist_ok=True)
 os.makedirs(os.path.join(settings.UPLOAD_DIR, "products"), exist_ok=True)
 os.makedirs(os.path.join(settings.UPLOAD_DIR, "reports"), exist_ok=True)
+os.makedirs(os.path.join(settings.UPLOAD_DIR, "crops"), exist_ok=True)
+os.makedirs(os.path.join(settings.UPLOAD_DIR, "fertilizers"), exist_ok=True)
+os.makedirs(os.path.join(settings.UPLOAD_DIR, "mandis"), exist_ok=True)
+os.makedirs(os.path.join(settings.UPLOAD_DIR, "states"), exist_ok=True)
+os.makedirs(os.path.join(settings.UPLOAD_DIR, "districts"), exist_ok=True)
+os.makedirs(os.path.join(settings.UPLOAD_DIR, "profiles"), exist_ok=True)

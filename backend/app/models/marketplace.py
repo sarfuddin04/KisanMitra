@@ -17,6 +17,7 @@ class ProductCategory(Base):
 
     products = relationship("Product", back_populates="category")
 
+
 class Product(Base):
     __tablename__ = "products"
 
@@ -26,12 +27,24 @@ class Product(Base):
     name = Column(String(150), index=True, nullable=False)
     description = Column(Text, nullable=True)
     price = Column(Float, nullable=False)
-    unit = Column(String(50), default="kg")  # kg, quintal, bag, liter, piece, packet
+    unit = Column(String(50), default="kg")
     stock_quantity = Column(Float, default=100.0)
     location = Column(String(200), nullable=True)
-    image_url = Column(String(255), nullable=True)
+
+    # Location hierarchy FK fields
+    state_id = Column(Integer, ForeignKey("states.id", ondelete="SET NULL"), nullable=True)
+    district_id = Column(Integer, ForeignKey("districts.id", ondelete="SET NULL"), nullable=True)
+    mandi_id = Column(Integer, ForeignKey("mandis.id", ondelete="SET NULL"), nullable=True)
+
+    # Denormalized for fast display
+    state_name = Column(String(100), nullable=True)
+    district_name = Column(String(100), nullable=True)
+    mandi_name = Column(String(150), nullable=True)
+
+    image_url = Column(String(255), nullable=True)     # primary image
     is_available = Column(Boolean, default=True)
     is_organic = Column(Boolean, default=False)
+    status = Column(String(50), default="PENDING")     # PENDING, APPROVED, REJECTED
     rating = Column(Float, default=4.8)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
@@ -40,6 +53,27 @@ class Product(Base):
     category = relationship("ProductCategory", back_populates="products")
     cart_items = relationship("CartItem", back_populates="product")
     order_items = relationship("OrderItem", back_populates="product")
+    images = relationship("ProductImage", back_populates="product", cascade="all, delete-orphan")
+
+    # Location relationships
+    state = relationship("State", foreign_keys=[state_id])
+    district = relationship("District", foreign_keys=[district_id])
+    mandi = relationship("Mandi", foreign_keys=[mandi_id])
+
+
+class ProductImage(Base):
+    """Multiple images per product."""
+    __tablename__ = "product_images"
+
+    id = Column(Integer, primary_key=True, index=True)
+    product_id = Column(Integer, ForeignKey("products.id", ondelete="CASCADE"), nullable=False, index=True)
+    image_url = Column(String(255), nullable=False)
+    is_primary = Column(Boolean, default=False)
+    display_order = Column(Integer, default=0)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+
+    product = relationship("Product", back_populates="images")
+
 
 class Cart(Base):
     __tablename__ = "carts"
@@ -50,6 +84,7 @@ class Cart(Base):
 
     user = relationship("User", back_populates="cart")
     items = relationship("CartItem", back_populates="cart", cascade="all, delete-orphan")
+
 
 class CartItem(Base):
     __tablename__ = "cart_items"
@@ -63,6 +98,7 @@ class CartItem(Base):
     cart = relationship("Cart", back_populates="items")
     product = relationship("Product", back_populates="cart_items")
 
+
 class Order(Base):
     __tablename__ = "orders"
 
@@ -73,8 +109,8 @@ class Order(Base):
     shipping_name = Column(String(120), nullable=False)
     shipping_address = Column(Text, nullable=False)
     shipping_phone = Column(String(50), nullable=False)
-    order_status = Column(String(50), default="PLACED")  # PLACED, CONFIRMED, SHIPPED, DELIVERED, CANCELLED
-    payment_status = Column(String(50), default="COMPLETED")  # PENDING, COMPLETED, FAILED, REFUNDED
+    order_status = Column(String(50), default="PLACED")
+    payment_status = Column(String(50), default="COMPLETED")
     payment_method = Column(String(50), default="Cash on Delivery / UPI")
     tracking_notes = Column(Text, nullable=True)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
@@ -83,6 +119,7 @@ class Order(Base):
     user = relationship("User", back_populates="orders")
     items = relationship("OrderItem", back_populates="order", cascade="all, delete-orphan")
     payment = relationship("Payment", back_populates="order", uselist=False, cascade="all, delete-orphan")
+
 
 class OrderItem(Base):
     __tablename__ = "order_items"
@@ -98,6 +135,7 @@ class OrderItem(Base):
 
     order = relationship("Order", back_populates="items")
     product = relationship("Product", back_populates="order_items")
+
 
 class Payment(Base):
     __tablename__ = "payments"
