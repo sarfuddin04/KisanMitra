@@ -14,10 +14,12 @@ from app.routes.orders import router as orders_router
 from app.routes.notifications import router as notif_router
 from app.routes.public import router as public_router
 from app.routes.admin import router as admin_router
+from app.routes.crops import router as crops_router
 
 api_router = APIRouter()
 
 api_router.include_router(auth_router)
+api_router.include_router(crops_router)
 api_router.include_router(rec_router)
 api_router.include_router(disease_router)
 api_router.include_router(fertilizer_router)
@@ -31,3 +33,4 @@ api_router.include_router(orders_router)
 api_router.include_router(notif_router)
 api_router.include_router(public_router)
 api_router.include_router(admin_router)
+

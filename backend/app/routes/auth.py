@@ -1,12 +1,26 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
+from typing import List
+
 from app.core.database import get_db
 from app.core.security import verify_password, hash_password, create_access_token
 from app.core.deps import get_current_user
-from app.models.user import User, Role, UserProfile
+from app.models.user import User, Role, UserProfile, UserCrop
+from app.models.agronomy import Crop
 from app.schemas.auth import UserRegister, UserLogin, Token, UserOut, UserProfileUpdate, PasswordChange
+from app.schemas.agronomy import CropOut
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
+
+def _format_user_crops(user: User):
+    crops_list = []
+    crop_ids = []
+    if user.user_crops:
+        for uc in user.user_crops:
+            if uc.crop and uc.crop.is_active:
+                crop_ids.append(uc.crop.id)
+                crops_list.append(CropOut.model_validate(uc.crop))
+    return crops_list, crop_ids
 
 @router.post("/register", response_model=Token)
 def register_user(req: UserRegister, db: Session = Depends(get_db)):
@@ -14,11 +28,27 @@ def register_user(req: UserRegister, db: Session = Depends(get_db)):
     clean_phone = req.phone.strip() if (req.phone and req.phone.strip()) else None
     clean_name = req.full_name.strip() if req.full_name else ""
 
+    if not clean_name:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Full name is required."
+        )
+
     if not clean_email:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="A valid email address is required."
         )
+
+    if req.confirm_password is not None and req.password != req.confirm_password:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Passwords do not match."
+        )
+
+    clean_gender = (req.gender or "male").strip().lower()
+    if clean_gender not in ["male", "female", "other"]:
+        clean_gender = "other"
 
     # Check if email exists
     existing = db.query(User).filter(User.email == clean_email).first()
@@ -43,12 +73,18 @@ def register_user(req: UserRegister, db: Session = Depends(get_db)):
     if not role:
         role = db.query(Role).filter(Role.name == "FARMER").first()
     if not role:
-        # Create default FARMER role if missing
         role = Role(name="FARMER", description="Farmer / Producer")
         db.add(role)
         db.commit()
         db.refresh(role)
         
+    # Validate crop_ids
+    valid_crops = []
+    if req.crop_ids:
+        valid_crops = db.query(Crop).filter(Crop.id.in_(req.crop_ids), Crop.is_active == True).all()
+
+    primary_crops_str = ", ".join([c.name for c in valid_crops]) if valid_crops else None
+
     try:
         new_user = User(
             role_id=role.id,
@@ -56,6 +92,7 @@ def register_user(req: UserRegister, db: Session = Depends(get_db)):
             email=clean_email,
             phone=clean_phone,
             password_hash=hash_password(req.password),
+            gender=clean_gender,
             is_active=True,
             is_verified=True,
             preferred_language=req.preferred_language or "en"
@@ -67,11 +104,20 @@ def register_user(req: UserRegister, db: Session = Depends(get_db)):
         # Create profile
         profile = UserProfile(
             user_id=new_user.id,
+            gender=clean_gender,
             farm_location=req.farm_location.strip() if req.farm_location else None,
-            farm_size_acres=req.farm_size or 1.0
+            farm_size_acres=req.farm_size or 1.0,
+            primary_crops=primary_crops_str
         )
         db.add(profile)
+
+        # Save user_crops many-to-many relationship
+        for crop in valid_crops:
+            user_crop = UserCrop(user_id=new_user.id, crop_id=crop.id)
+            db.add(user_crop)
+
         db.commit()
+        db.refresh(new_user)
     except Exception as e:
         db.rollback()
         raise HTTPException(
@@ -81,6 +127,7 @@ def register_user(req: UserRegister, db: Session = Depends(get_db)):
     
     # Generate Token
     token = create_access_token(subject=new_user.id, role=role.name)
+    crops_list, crop_ids = _format_user_crops(new_user)
     
     return {
         "access_token": token,
@@ -91,14 +138,18 @@ def register_user(req: UserRegister, db: Session = Depends(get_db)):
             "full_name": new_user.full_name,
             "email": new_user.email,
             "phone": new_user.phone,
+            "gender": new_user.gender,
             "role": role.name,
-            "preferred_language": new_user.preferred_language
+            "role_name": role.name,
+            "preferred_language": new_user.preferred_language,
+            "crop_ids": crop_ids,
+            "crops": [c.model_dump() for c in crops_list]
         }
     }
 
 @router.post("/login", response_model=Token)
 def login_user(req: UserLogin, db: Session = Depends(get_db)):
-    user = db.query(User).filter(User.email == req.email.lower()).first()
+    user = db.query(User).filter(User.email == req.email.lower().strip()).first()
     if not user or not verify_password(req.password, user.password_hash):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -113,6 +164,7 @@ def login_user(req: UserLogin, db: Session = Depends(get_db)):
         
     role_name = user.role.name if user.role else "FARMER"
     token = create_access_token(subject=user.id, role=role_name)
+    crops_list, crop_ids = _format_user_crops(user)
     
     return {
         "access_token": token,
@@ -123,23 +175,31 @@ def login_user(req: UserLogin, db: Session = Depends(get_db)):
             "full_name": user.full_name,
             "email": user.email,
             "phone": user.phone,
+            "gender": user.gender,
             "role": role_name,
-            "preferred_language": user.preferred_language
+            "role_name": role_name,
+            "preferred_language": user.preferred_language,
+            "crop_ids": crop_ids,
+            "crops": [c.model_dump() for c in crops_list]
         }
     }
 
 @router.get("/me", response_model=UserOut)
 def get_current_user_profile(current_user: User = Depends(get_current_user)):
+    crops_list, crop_ids = _format_user_crops(current_user)
     user_out = UserOut(
         id=current_user.id,
         full_name=current_user.full_name,
         email=current_user.email,
         phone=current_user.phone,
+        gender=current_user.gender,
         role_name=current_user.role.name if current_user.role else "FARMER",
         is_active=current_user.is_active,
         preferred_language=current_user.preferred_language,
         created_at=current_user.created_at,
-        profile=current_user.profile
+        profile=current_user.profile,
+        crops=crops_list,
+        crop_ids=crop_ids
     )
     return user_out
 
@@ -149,20 +209,26 @@ def update_profile(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    if req.full_name:
-        current_user.full_name = req.full_name
-    if req.phone:
-        current_user.phone = req.phone
-    if req.preferred_language:
+    if req.full_name is not None:
+        current_user.full_name = req.full_name.strip()
+    if req.phone is not None:
+        current_user.phone = req.phone.strip() if req.phone.strip() else None
+    if req.preferred_language is not None:
         current_user.preferred_language = req.preferred_language
+    if req.gender is not None:
+        clean_gender = req.gender.strip().lower()
+        if clean_gender in ["male", "female", "other"]:
+            current_user.gender = clean_gender
         
     profile = current_user.profile
     if not profile:
         profile = UserProfile(user_id=current_user.id)
         db.add(profile)
         
+    if req.gender is not None:
+        profile.gender = current_user.gender
     if req.farm_location is not None:
-        profile.farm_location = req.farm_location
+        profile.farm_location = req.farm_location.strip() if req.farm_location else None
     if req.farm_size_acres is not None:
         profile.farm_size_acres = req.farm_size_acres
     if req.primary_crops is not None:
@@ -177,20 +243,33 @@ def update_profile(
         profile.district = req.district
     if req.bio is not None:
         profile.bio = req.bio
+
+    # Update crop_ids if passed
+    if req.crop_ids is not None:
+        # Delete existing
+        db.query(UserCrop).filter(UserCrop.user_id == current_user.id).delete()
+        valid_crops = db.query(Crop).filter(Crop.id.in_(req.crop_ids), Crop.is_active == True).all() if req.crop_ids else []
+        for c in valid_crops:
+            db.add(UserCrop(user_id=current_user.id, crop_id=c.id))
+        profile.primary_crops = ", ".join([c.name for c in valid_crops]) if valid_crops else None
         
     db.commit()
     db.refresh(current_user)
     
+    crops_list, crop_ids = _format_user_crops(current_user)
     return UserOut(
         id=current_user.id,
         full_name=current_user.full_name,
         email=current_user.email,
         phone=current_user.phone,
+        gender=current_user.gender,
         role_name=current_user.role.name if current_user.role else "FARMER",
         is_active=current_user.is_active,
         preferred_language=current_user.preferred_language,
         created_at=current_user.created_at,
-        profile=current_user.profile
+        profile=current_user.profile,
+        crops=crops_list,
+        crop_ids=crop_ids
     )
 
 @router.post("/change-password")

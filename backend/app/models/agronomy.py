@@ -29,6 +29,9 @@ class Crop(Base):
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
 
+    user_crops = relationship("UserCrop", back_populates="crop", cascade="all, delete-orphan")
+
+
 class Fertilizer(Base):
     __tablename__ = "fertilizers"
 

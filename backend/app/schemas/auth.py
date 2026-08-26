@@ -1,6 +1,7 @@
 from pydantic import BaseModel, EmailStr, Field
-from typing import Optional
+from typing import Optional, List
 from datetime import datetime
+from app.schemas.agronomy import CropOut
 
 class Token(BaseModel):
     access_token: str
@@ -18,10 +19,12 @@ class UserRegister(BaseModel):
     phone: Optional[str] = None
     password: str = Field(..., min_length=6)
     confirm_password: Optional[str] = None
+    gender: Optional[str] = "male"  # male, female, other
     farm_location: Optional[str] = None
     farm_size: Optional[float] = 1.0
     preferred_language: Optional[str] = "en"
     role_name: Optional[str] = "FARMER"
+    crop_ids: Optional[List[int]] = []
 
 class UserLogin(BaseModel):
     email: EmailStr
@@ -29,6 +32,7 @@ class UserLogin(BaseModel):
 
 class UserProfileOut(BaseModel):
     id: Optional[int] = None
+    gender: Optional[str] = None
     farm_location: Optional[str] = None
     farm_size_acres: Optional[float] = None
     primary_crops: Optional[str] = None
@@ -47,11 +51,14 @@ class UserOut(BaseModel):
     full_name: str
     email: str
     phone: Optional[str] = None
+    gender: Optional[str] = None
     role_name: Optional[str] = None
     is_active: bool
     preferred_language: str
     created_at: datetime
     profile: Optional[UserProfileOut] = None
+    crops: Optional[List[CropOut]] = []
+    crop_ids: Optional[List[int]] = []
 
     class Config:
         from_attributes = True
@@ -59,9 +66,11 @@ class UserOut(BaseModel):
 class UserProfileUpdate(BaseModel):
     full_name: Optional[str] = None
     phone: Optional[str] = None
+    gender: Optional[str] = None
     farm_location: Optional[str] = None
     farm_size_acres: Optional[float] = None
     primary_crops: Optional[str] = None
+    crop_ids: Optional[List[int]] = None
     soil_type: Optional[str] = None
     irrigation_source: Optional[str] = None
     state: Optional[str] = None
@@ -72,6 +81,7 @@ class UserProfileUpdate(BaseModel):
 class PasswordChange(BaseModel):
     current_password: str
     new_password: str = Field(..., min_length=6)
+
 
 class AdminCreateUser(BaseModel):
     full_name: str = Field(..., min_length=2, max_length=100)

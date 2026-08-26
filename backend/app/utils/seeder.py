@@ -1,6 +1,6 @@
 import datetime
 from sqlalchemy.orm import Session
-from app.core.database import Base, engine, SessionLocal
+from app.core.database import Base, engine, SessionLocal, sync_schema
 from app.core.security import hash_password
 from app.models.user import Role, User, UserProfile
 from app.models.agronomy import Crop, Fertilizer, Disease
@@ -9,11 +9,13 @@ from app.models.marketplace import ProductCategory, Product
 from app.models.content import FarmingTip, Banner, FAQ, SystemSetting, Notification
 
 def seed_database(db: Session = None):
+    sync_schema(engine)
+    Base.metadata.create_all(bind=engine)
     auto_close = False
     if db is None:
-        Base.metadata.create_all(bind=engine)
         db = SessionLocal()
         auto_close = True
+
 
     try:
         # 1. Roles
@@ -86,19 +88,148 @@ def seed_database(db: Session = None):
             db.add(farmer_profile)
             db.commit()
 
-        # 3. Crops
-        if db.query(Crop).count() == 0:
-            crops_data = [
-                {"name": "Rice", "scientific_name": "Oryza sativa", "category": "Cereal", "season": "Kharif", "min_n": 60, "max_n": 100, "min_p": 35, "max_p": 60, "min_k": 35, "max_k": 45, "min_ph": 5.0, "max_ph": 7.0, "optimal_temp_c": "20-27", "optimal_rainfall_mm": "180-300", "duration_days": 130, "description": "Major staple cereal crop in India requiring standing water in early vegetative stages.", "cultivation_guide": "Transplant 21-day old seedlings with 20x15cm spacing. Maintain 2-5cm standing water until grain hardening stage."},
-                {"name": "Wheat", "scientific_name": "Triticum aestivum", "category": "Cereal", "season": "Rabi", "min_n": 80, "max_n": 120, "min_p": 40, "max_p": 60, "min_k": 30, "max_k": 50, "min_ph": 6.0, "max_ph": 7.5, "optimal_temp_c": "15-25", "optimal_rainfall_mm": "50-100", "duration_days": 120, "description": "Primary winter staple cereal grown across Indo-Gangetic plains.", "cultivation_guide": "Sow in lines in mid-November. Apply critical irrigations at CRI (21 DAS) and flowering stages."},
-                {"name": "Maize", "scientific_name": "Zea mays", "category": "Cereal", "season": "Kharif / Rabi", "min_n": 60, "max_n": 100, "min_p": 35, "max_p": 60, "min_k": 15, "max_k": 25, "min_ph": 5.5, "max_ph": 7.5, "optimal_temp_c": "18-27", "optimal_rainfall_mm": "60-110", "duration_days": 100, "description": "Versatile cereal crop used for human food, poultry feed, and industrial starch.", "cultivation_guide": "Plant with 60x20cm spacing. Ridge and furrow planting improves drainage and root lodging resistance."},
-                {"name": "Chickpea", "scientific_name": "Cicer arietinum", "category": "Pulses", "season": "Rabi", "min_n": 20, "max_n": 60, "min_p": 55, "max_p": 80, "min_k": 75, "max_k": 85, "min_ph": 5.9, "max_ph": 8.5, "optimal_temp_c": "17-22", "optimal_rainfall_mm": "65-95", "duration_days": 110, "description": "Major pulse crop supplying plant protein and enriching soil nitrogen via root nodules.", "cultivation_guide": "Treat seeds with Rhizobium culture. Nip shoot tips at 30-40 days to encourage heavy branching."},
-                {"name": "Cotton", "scientific_name": "Gossypium hirsutum", "category": "Cash Crop", "season": "Kharif", "min_n": 100, "max_n": 140, "min_p": 35, "max_p": 60, "min_k": 15, "max_k": 25, "min_ph": 6.0, "max_ph": 8.0, "optimal_temp_c": "22-26", "optimal_rainfall_mm": "60-100", "duration_days": 160, "description": "White Gold of agriculture; deep-rooted fiber crop thriving in deep black soils.", "cultivation_guide": "Maintain 90x60cm spacing. Regularly monitor square formation and boll development for pest prevention."},
-                {"name": "Mustard", "scientific_name": "Brassica juncea", "category": "Oilseeds", "season": "Rabi", "min_n": 60, "max_n": 90, "min_p": 30, "max_p": 50, "min_k": 20, "max_k": 40, "min_ph": 6.0, "max_ph": 7.5, "optimal_temp_c": "15-22", "optimal_rainfall_mm": "30-60", "duration_days": 105, "description": "Important edible oilseed crop grown in winter across North and Central India.", "cultivation_guide": "Sow in October for optimal vegetative growth. Apply Sulphur @ 20 kg/ha to increase seed oil percentage."}
-            ]
-            for c in crops_data:
+        # 3. Crops (10 essential agricultural crops with images)
+        crops_data = [
+            {
+                "name": "Wheat",
+                "scientific_name": "Triticum aestivum",
+                "category": "Cereal",
+                "season": "Rabi",
+                "min_n": 80, "max_n": 120, "min_p": 40, "max_p": 60, "min_k": 30, "max_k": 50,
+                "min_ph": 6.0, "max_ph": 7.5,
+                "optimal_temp_c": "15-25", "optimal_rainfall_mm": "50-100", "duration_days": 120,
+                "image_url": "https://images.unsplash.com/photo-1574323347407-f5e1ad6d020b?auto=format&fit=crop&w=400&q=80",
+                "description": "Primary winter staple cereal grown across Indo-Gangetic plains.",
+                "cultivation_guide": "Sow in lines in mid-November. Apply critical irrigations at CRI (21 DAS) and flowering stages.",
+                "is_active": True
+            },
+            {
+                "name": "Rice",
+                "scientific_name": "Oryza sativa",
+                "category": "Cereal",
+                "season": "Kharif",
+                "min_n": 60, "max_n": 100, "min_p": 35, "max_p": 60, "min_k": 35, "max_k": 45,
+                "min_ph": 5.0, "max_ph": 7.0,
+                "optimal_temp_c": "20-27", "optimal_rainfall_mm": "180-300", "duration_days": 130,
+                "image_url": "https://images.unsplash.com/photo-1586201375761-83865001e31c?auto=format&fit=crop&w=400&q=80",
+                "description": "Major staple cereal crop in India requiring standing water in early vegetative stages.",
+                "cultivation_guide": "Transplant 21-day old seedlings with 20x15cm spacing. Maintain 2-5cm standing water until grain hardening stage.",
+                "is_active": True
+            },
+            {
+                "name": "Maize",
+                "scientific_name": "Zea mays",
+                "category": "Cereal",
+                "season": "Kharif / Rabi",
+                "min_n": 60, "max_n": 100, "min_p": 35, "max_p": 60, "min_k": 15, "max_k": 25,
+                "min_ph": 5.5, "max_ph": 7.5,
+                "optimal_temp_c": "18-27", "optimal_rainfall_mm": "60-110", "duration_days": 100,
+                "image_url": "https://images.unsplash.com/photo-1551754655-cd27e38d2076?auto=format&fit=crop&w=400&q=80",
+                "description": "Versatile cereal crop used for human food, poultry feed, and industrial starch.",
+                "cultivation_guide": "Plant with 60x20cm spacing. Ridge and furrow planting improves drainage and root lodging resistance.",
+                "is_active": True
+            },
+            {
+                "name": "Cotton",
+                "scientific_name": "Gossypium hirsutum",
+                "category": "Cash Crop",
+                "season": "Kharif",
+                "min_n": 100, "max_n": 140, "min_p": 35, "max_p": 60, "min_k": 15, "max_k": 25,
+                "min_ph": 6.0, "max_ph": 8.0,
+                "optimal_temp_c": "22-26", "optimal_rainfall_mm": "60-100", "duration_days": 160,
+                "image_url": "https://images.unsplash.com/photo-1605000797499-95a51c5269ae?auto=format&fit=crop&w=400&q=80",
+                "description": "White Gold of agriculture; deep-rooted fiber crop thriving in deep black soils.",
+                "cultivation_guide": "Maintain 90x60cm spacing. Regularly monitor square formation and boll development for pest prevention.",
+                "is_active": True
+            },
+            {
+                "name": "Sugarcane",
+                "scientific_name": "Saccharum officinarum",
+                "category": "Cash Crop",
+                "season": "Year-round",
+                "min_n": 120, "max_n": 200, "min_p": 40, "max_p": 80, "min_k": 60, "max_k": 120,
+                "min_ph": 6.0, "max_ph": 7.5,
+                "optimal_temp_c": "20-35", "optimal_rainfall_mm": "150-250", "duration_days": 360,
+                "image_url": "https://images.unsplash.com/photo-1596797882870-8c33deeac224?auto=format&fit=crop&w=400&q=80",
+                "description": "High-value commercial perennial grass crop used for sugar, jaggery, and ethanol production.",
+                "cultivation_guide": "Plant two-budded setts in deep furrows with 90-120cm row spacing. Earthing up at 90 days prevents lodging.",
+                "is_active": True
+            },
+            {
+                "name": "Potato",
+                "scientific_name": "Solanum tuberosum",
+                "category": "Vegetable",
+                "season": "Rabi",
+                "min_n": 100, "max_n": 150, "min_p": 60, "max_p": 100, "min_k": 80, "max_k": 120,
+                "min_ph": 5.2, "max_ph": 6.8,
+                "optimal_temp_c": "15-20", "optimal_rainfall_mm": "50-80", "duration_days": 90,
+                "image_url": "https://images.unsplash.com/photo-1518977676601-b53f82aba655?auto=format&fit=crop&w=400&q=80",
+                "description": "Major tuber vegetable crop rich in carbohydrates, vitamins, and minerals.",
+                "cultivation_guide": "Plant sprouted seed tubers at 60x20cm spacing. Regular earthing up protects developing tubers from sun-greening.",
+                "is_active": True
+            },
+            {
+                "name": "Tomato",
+                "scientific_name": "Solanum lycopersicum",
+                "category": "Vegetable",
+                "season": "Year-round",
+                "min_n": 80, "max_n": 120, "min_p": 40, "max_p": 60, "min_k": 40, "max_k": 80,
+                "min_ph": 6.0, "max_ph": 7.0,
+                "optimal_temp_c": "18-27", "optimal_rainfall_mm": "60-120", "duration_days": 100,
+                "image_url": "https://images.unsplash.com/photo-1592924357228-91a4daadcfea?auto=format&fit=crop&w=400&q=80",
+                "description": "High-demand vegetable crop cultivated across all seasons with high commercial return.",
+                "cultivation_guide": "Stake indeterminate plants with bamboo trellises. Mulching with paddy straw reduces soil-borne fruit rot.",
+                "is_active": True
+            },
+            {
+                "name": "Onion",
+                "scientific_name": "Allium cepa",
+                "category": "Vegetable",
+                "season": "Rabi / Kharif",
+                "min_n": 60, "max_n": 100, "min_p": 40, "max_p": 60, "min_k": 40, "max_k": 60,
+                "min_ph": 6.0, "max_ph": 7.5,
+                "optimal_temp_c": "15-25", "optimal_rainfall_mm": "40-75", "duration_days": 120,
+                "image_url": "https://images.unsplash.com/photo-1618512496248-a07fe83aa8cb?auto=format&fit=crop&w=400&q=80",
+                "description": "Indispensable bulb vegetable crop widely grown and traded across Indian APMC mandis.",
+                "cultivation_guide": "Transplant 6-8 week old healthy seedlings at 15x10cm spacing in flat beds. Stop irrigation 15 days before harvesting.",
+                "is_active": True
+            },
+            {
+                "name": "Gram (Chickpea)",
+                "scientific_name": "Cicer arietinum",
+                "category": "Pulses",
+                "season": "Rabi",
+                "min_n": 20, "max_n": 60, "min_p": 55, "max_p": 80, "min_k": 75, "max_k": 85,
+                "min_ph": 5.9, "max_ph": 8.5,
+                "optimal_temp_c": "17-22", "optimal_rainfall_mm": "65-95", "duration_days": 110,
+                "image_url": "https://images.unsplash.com/photo-1515543904379-3d757afe72e6?auto=format&fit=crop&w=400&q=80",
+                "description": "Major pulse crop supplying plant protein and enriching soil nitrogen via root nodules.",
+                "cultivation_guide": "Treat seeds with Rhizobium culture. Nip shoot tips at 30-40 days to encourage heavy branching.",
+                "is_active": True
+            },
+            {
+                "name": "Mustard",
+                "scientific_name": "Brassica juncea",
+                "category": "Oilseeds",
+                "season": "Rabi",
+                "min_n": 60, "max_n": 90, "min_p": 30, "max_p": 50, "min_k": 20, "max_k": 40,
+                "min_ph": 6.0, "max_ph": 7.5,
+                "optimal_temp_c": "15-22", "optimal_rainfall_mm": "30-60", "duration_days": 105,
+                "image_url": "https://images.unsplash.com/photo-1508747703725-719777637510?auto=format&fit=crop&w=400&q=80",
+                "description": "Important edible oilseed crop grown in winter across North and Central India.",
+                "cultivation_guide": "Sow in October for optimal vegetative growth. Apply Sulphur @ 20 kg/ha to increase seed oil percentage.",
+                "is_active": True
+            }
+        ]
+        for c in crops_data:
+            existing_crop = db.query(Crop).filter((Crop.name == c["name"]) | (Crop.name == c["name"].split(" ")[0])).first()
+            if existing_crop:
+                for k, v in c.items():
+                    setattr(existing_crop, k, v)
+            else:
                 db.add(Crop(**c))
-            db.commit()
+        db.commit()
+
 
         # 4. Fertilizers
         if db.query(Fertilizer).count() == 0:

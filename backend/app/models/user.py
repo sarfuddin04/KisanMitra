@@ -22,6 +22,7 @@ class User(Base):
     email = Column(String(150), unique=True, index=True, nullable=False)
     phone = Column(String(20), unique=True, index=True, nullable=True)
     password_hash = Column(String(255), nullable=False)
+    gender = Column(String(20), nullable=True)  # 'male', 'female', 'other'
     is_active = Column(Boolean, default=True)
     is_verified = Column(Boolean, default=False)
     preferred_language = Column(String(10), default="en")  # 'en' or 'hi'
@@ -30,6 +31,7 @@ class User(Base):
 
     role = relationship("Role", back_populates="users")
     profile = relationship("UserProfile", back_populates="user", uselist=False, cascade="all, delete-orphan")
+    user_crops = relationship("UserCrop", back_populates="user", cascade="all, delete-orphan")
     crop_recommendations = relationship("CropRecommendation", back_populates="user")
     disease_predictions = relationship("DiseasePrediction", back_populates="user")
     fertilizer_recommendations = relationship("FertilizerRecommendation", back_populates="user")
@@ -43,6 +45,7 @@ class UserProfile(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"), unique=True, nullable=False)
+    gender = Column(String(20), nullable=True)
     farm_location = Column(String(255), nullable=True)
     farm_size_acres = Column(Float, nullable=True, default=1.0)
     primary_crops = Column(String(255), nullable=True)
@@ -56,3 +59,15 @@ class UserProfile(Base):
     updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
 
     user = relationship("User", back_populates="profile")
+
+class UserCrop(Base):
+    __tablename__ = "user_crops"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    crop_id = Column(Integer, ForeignKey("crops.id", ondelete="CASCADE"), nullable=False, index=True)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+
+    user = relationship("User", back_populates="user_crops")
+    crop = relationship("Crop", back_populates="user_crops")
+

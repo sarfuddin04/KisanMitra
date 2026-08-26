@@ -11,13 +11,14 @@ from fastapi.staticfiles import StaticFiles
 from contextlib import asynccontextmanager
 
 from app.core.config import settings
-from app.core.database import Base, engine, SessionLocal
+from app.core.database import Base, engine, SessionLocal, sync_schema
 from app.utils.seeder import seed_database
 from app.routes import api_router
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Startup: Ensure DB tables exist and are seeded
+    # Startup: Ensure DB tables exist, columns are synced, and are seeded
+    sync_schema(engine)
     Base.metadata.create_all(bind=engine)
     db = SessionLocal()
     try:
@@ -25,6 +26,7 @@ async def lifespan(app: FastAPI):
     finally:
         db.close()
     yield
+
     # Shutdown logic if any
 
 app = FastAPI(
@@ -48,6 +50,7 @@ os.makedirs(settings.UPLOAD_DIR, exist_ok=True)
 app.mount("/api/static", StaticFiles(directory=settings.UPLOAD_DIR), name="static")
 
 from app.routes.auth import router as auth_router
+from app.routes.crops import router as crops_router
 from app.routes.recommendations import router as rec_router
 from app.routes.disease import router as disease_router
 from app.routes.fertilizer import router as fertilizer_router
@@ -64,7 +67,9 @@ from app.routes.admin import router as admin_router
 
 # Mount all API routers
 app.include_router(auth_router, prefix=settings.API_V1_STR)
+app.include_router(crops_router, prefix=settings.API_V1_STR)
 app.include_router(rec_router, prefix=settings.API_V1_STR)
+
 app.include_router(disease_router, prefix=settings.API_V1_STR)
 app.include_router(fertilizer_router, prefix=settings.API_V1_STR)
 app.include_router(weather_router, prefix=settings.API_V1_STR)

@@ -1,5 +1,5 @@
 from app.core.database import Base
-from app.models.user import Role, User, UserProfile
+from app.models.user import Role, User, UserProfile, UserCrop
 from app.models.agronomy import (
     Crop,
     Fertilizer,
@@ -34,6 +34,7 @@ __all__ = [
     "Role",
     "User",
     "UserProfile",
+    "UserCrop",
     "Crop",
     "Fertilizer",
     "Disease",

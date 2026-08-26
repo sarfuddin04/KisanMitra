@@ -52,8 +52,30 @@ def get_engine():
         ACTIVE_DB_TARGET = SQLITE_DB_PATH
         return create_engine(sqlite_url, connect_args={"check_same_thread": False})
 
+from sqlalchemy import text
+
+def sync_schema(eng):
+    try:
+        with eng.begin() as conn:
+            dialect_name = eng.dialect.name
+            if dialect_name == "postgresql":
+                conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS gender VARCHAR(20);"))
+                conn.execute(text("ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS gender VARCHAR(20);"))
+            elif dialect_name == "sqlite":
+                res = conn.execute(text("PRAGMA table_info(users);")).fetchall()
+                cols = [r[1] for r in res]
+                if "gender" not in cols:
+                    conn.execute(text("ALTER TABLE users ADD COLUMN gender VARCHAR(20);"))
+                res_prof = conn.execute(text("PRAGMA table_info(user_profiles);")).fetchall()
+                cols_prof = [r[1] for r in res_prof]
+                if "gender" not in cols_prof:
+                    conn.execute(text("ALTER TABLE user_profiles ADD COLUMN gender VARCHAR(20);"))
+    except Exception as e:
+        logger.warning(f"Schema sync notice: {e}")
+
 engine = get_engine()
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
 
 def get_db():
     db = SessionLocal()
