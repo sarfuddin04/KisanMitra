@@ -39,6 +39,7 @@ class Fertilizer(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String(120), unique=True, index=True, nullable=False)
+    brand = Column(String(100), nullable=True)                           # Brand / Manufacturer
     formula_or_ratio = Column(String(50), nullable=True)  # e.g., 46-0-0, 18-46-0, 0-0-60
     category = Column(String(50), default="Inorganic")  # Chemical / Organic / Bio-fertilizer
     nitrogen_pct = Column(Float, default=0.0)
@@ -49,9 +50,45 @@ class Fertilizer(Base):
     application_guidance = Column(Text, nullable=True)
     precautions = Column(Text, nullable=True)
     image_url = Column(String(255), nullable=True)
+    # Pricing (manually entered by Admin / Seller — NOT from any live official source)
+    current_price = Column(Float, nullable=True)         # current MRP per unit
+    price_unit = Column(String(50), default="50kg bag") # e.g. 'kg', '50kg bag', 'liter'
+    price_updated_at = Column(DateTime, nullable=True)   # when price was last set
+    price_source = Column(String(100), default="admin_entry")  # admin_entry / seller_entry
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
+
+    prices = relationship("FertilizerPrice", back_populates="fertilizer", cascade="all, delete-orphan")
+
+
+class FertilizerPrice(Base):
+    """
+    Price history for fertilizers.
+    NOTE: No official live API exists for fertilizer retail pricing in India.
+    All prices here are MANUALLY entered by Admin or Sellers.
+    UI must clearly display 'Price updated on: DATE' and NOT call these 'Live'.
+    """
+    __tablename__ = "fertilizer_prices"
+
+    id = Column(Integer, primary_key=True, index=True)
+    fertilizer_id = Column(Integer, ForeignKey("fertilizers.id", ondelete="CASCADE"), nullable=False, index=True)
+    fertilizer_name = Column(String(120), nullable=False)     # denormalized
+    price = Column(Float, nullable=False)
+    unit = Column(String(50), default="50kg bag")
+    state = Column(String(100), nullable=True)
+    district = Column(String(100), nullable=True)
+    # Price type must always be one of these — never 'LIVE'
+    price_type = Column(String(50), default="ADMIN_ENTRY")    # ADMIN_ENTRY | SELLER_ENTRY
+    entered_by = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    notes = Column(Text, nullable=True)
+    price_date = Column(DateTime, default=datetime.datetime.utcnow)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+
+    fertilizer = relationship("Fertilizer", back_populates="prices")
+    entered_by_user = relationship("User", foreign_keys=[entered_by])
+
+
 
 class Disease(Base):
     __tablename__ = "diseases"

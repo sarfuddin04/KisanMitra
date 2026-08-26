@@ -3,6 +3,7 @@ from app.models.user import Role, User, UserProfile, UserCrop
 from app.models.agronomy import (
     Crop,
     Fertilizer,
+    FertilizerPrice,
     Disease,
     CropRecommendation,
     DiseasePrediction,
@@ -37,7 +38,7 @@ from app.models.content import (
 __all__ = [
     "Base",
     "Role", "User", "UserProfile", "UserCrop",
-    "Crop", "Fertilizer", "Disease",
+    "Crop", "Fertilizer", "FertilizerPrice", "Disease",
     "CropRecommendation", "DiseasePrediction", "FertilizerRecommendation",
     "State", "District", "Mandi", "Market",
     "MarketPrice", "MarketPriceHistory", "PriceSyncLog",

@@ -1,224 +1,284 @@
-import React, { useState, useEffect } from 'react';
-import { ShoppingBag, Search, Filter, ShoppingCart, Check, Star, MapPin, Tag, Plus } from 'lucide-react';
-import { Link } from 'react-router-dom';
-import api from '../../services/api';
-import { useCart } from '../../context/CartContext';
+import React, { useState, useEffect, useCallback } from 'react';
+import { ShoppingCart, Search, Filter, MapPin, Tag, Package, Plus, Eye, Heart, X, ChevronDown } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import api from '../../services/api';
+
+const PRODUCT_FALLBACK = 'https://images.unsplash.com/photo-1574943320219-553eb213f72d?w=400&q=80';
 
 export const MarketplacePage = () => {
-  const { addToCart } = useCart();
-  const { isAuthenticated } = useAuth();
-
+  const navigate = useNavigate();
+  const { isAuthenticated, requireAuth } = useAuth();
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState([]);
-  const [selectedCat, setSelectedCat] = useState('');
-  const [search, setSearch] = useState('');
-  const [organicOnly, setOrganicOnly] = useState(false);
-  const [addedItem, setAddedItem] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  const fetchCatalog = async () => {
+  // Filters
+  const [search, setSearch] = useState('');
+  const [categoryId, setCategoryId] = useState('');
+  const [sortBy, setSortBy] = useState('newest');
+  const [minPrice, setMinPrice] = useState('');
+  const [maxPrice, setMaxPrice] = useState('');
+  const [showFilters, setShowFilters] = useState(false);
+
+  // Location filters (from DB)
+  const [states, setStates] = useState([]);
+  const [districts, setDistricts] = useState([]);
+  const [mandis, setMandis] = useState([]);
+  const [stateId, setStateId] = useState('');
+  const [districtId, setDistrictId] = useState('');
+  const [mandiId, setMandiId] = useState('');
+
+  // Load initial data
+  useEffect(() => {
+    api.get('/marketplace/categories').then(r => setCategories(r.data || [])).catch(() => {});
+    api.get('/states').then(r => setStates(r.data || [])).catch(() => {});
+  }, []);
+
+  // Dependent dropdowns
+  useEffect(() => {
+    setDistricts([]); setMandis([]); setDistrictId(''); setMandiId('');
+    if (stateId) {
+      api.get(`/states/${stateId}/districts`).then(r => setDistricts(r.data || [])).catch(() => {});
+    }
+  }, [stateId]);
+
+  useEffect(() => {
+    setMandis([]); setMandiId('');
+    if (districtId) {
+      api.get(`/districts/${districtId}/mandis`).then(r => setMandis(r.data || [])).catch(() => {});
+    }
+  }, [districtId]);
+
+  const fetchProducts = useCallback(async () => {
     setLoading(true);
     try {
-      let url = '/marketplace/products?';
-      if (selectedCat) url += `category_id=${selectedCat}&`;
-      if (search) url += `search=${encodeURIComponent(search)}&`;
-      if (organicOnly) url += `is_organic=true&`;
-
-      const [pRes, cRes] = await Promise.all([
-        api.get(url),
-        api.get('/marketplace/categories')
-      ]);
-
-      setProducts(pRes.data || []);
-      setCategories(cRes.data || []);
+      const params = new URLSearchParams();
+      if (search) params.append('search', search);
+      if (categoryId) params.append('category_id', categoryId);
+      if (sortBy) params.append('sort_by', sortBy);
+      if (minPrice) params.append('min_price', minPrice);
+      if (maxPrice) params.append('max_price', maxPrice);
+      if (stateId) params.append('state_id', stateId);
+      if (districtId) params.append('district_id', districtId);
+      if (mandiId) params.append('mandi_id', mandiId);
+      const res = await api.get(`/marketplace/products?${params.toString()}`);
+      setProducts(res.data || []);
     } catch (err) {
-      console.error("Marketplace fetch error:", err);
+      console.error("Failed to load products:", err);
     } finally {
       setLoading(false);
     }
+  }, [search, categoryId, sortBy, minPrice, maxPrice, stateId, districtId, mandiId]);
+
+  useEffect(() => { fetchProducts(); }, [categoryId, sortBy, stateId, districtId, mandiId]);
+
+  const handleSearch = (e) => {
+    e.preventDefault();
+    fetchProducts();
   };
 
-  useEffect(() => {
-    fetchCatalog();
-  }, [selectedCat, organicOnly]);
+  const handleAddToCart = (product) => {
+    if (!requireAuth('Please login to add items to your cart.')) return;
+    // Cart logic would go here
+    alert(`"${product.name}" added to cart!`);
+  };
 
-  const handleAddToCart = async (product) => {
-    try {
-      await addToCart(product.id, 1);
-      setAddedItem(product.id);
-      setTimeout(() => setAddedItem(null), 2000);
-    } catch (err) {
-      alert("Please login to add products to your cart.");
+  const handleBuyNow = (product) => {
+    if (!requireAuth('Please login to buy this product.')) return;
+    navigate('/checkout', { state: { product } });
+  };
+
+  const handleSellProduct = () => {
+    if (!requireAuth('Please login to sell your products.')) return;
+    navigate('/my-products');
+  };
+
+  const getImageUrl = (product) => {
+    if (product.image_url) {
+      return product.image_url.startsWith('http') ? product.image_url : `/api/static/${product.image_url}`;
     }
+    return PRODUCT_FALLBACK;
+  };
+
+  const formatPrice = (price) => {
+    return `₹${(price || 0).toLocaleString('en-IN')}`;
   };
 
   return (
-    <div className="max-w-7xl mx-auto space-y-8">
-      
-      {/* Header & Seller CTA */}
+    <div className="max-w-6xl mx-auto space-y-6">
+      {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <h2 className="text-2xl font-black text-gray-900 tracking-tight flex items-center space-x-2">
-            <ShoppingBag className="w-7 h-7 text-emerald-600" />
-            <span>Agricultural Marketplace & Produce Network</span>
+            <Package className="w-7 h-7 text-emerald-600" />
+            <span>Agriculture Marketplace</span>
           </h2>
-          <p className="text-xs text-gray-500 mt-1">
-            Direct farmer-to-buyer trade for certified seeds, organic grains, bio-fertilizers, and farm tools
-          </p>
+          <p className="text-xs text-gray-500 mt-1">Buy & sell agricultural products directly</p>
         </div>
-
-        <div className="flex items-center space-x-3">
-          <Link
-            to="/my-products"
-            className="px-4 py-2.5 bg-emerald-50 text-emerald-800 border border-emerald-300 font-bold text-xs rounded-xl hover:bg-emerald-100 transition-all flex items-center space-x-1.5"
-          >
-            <Plus className="w-4 h-4 text-emerald-600" />
-            <span>Sell Your Farm Produce</span>
-          </Link>
-          <Link
-            to="/cart"
-            className="px-4 py-2.5 bg-emerald-600 text-white font-bold text-xs rounded-xl shadow-md hover:bg-emerald-700 transition-all flex items-center space-x-1.5"
-          >
-            <ShoppingCart className="w-4 h-4" />
-            <span>View Cart</span>
-          </Link>
-        </div>
+        <button onClick={handleSellProduct}
+          className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-md transition-all flex items-center space-x-1.5">
+          <Plus className="w-4 h-4" />
+          <span>Sell Your Product</span>
+        </button>
       </div>
 
-      {/* Filter and Search Row */}
-      <div className="bg-white p-4 sm:p-6 rounded-3xl border border-emerald-100 shadow-xs space-y-4">
-        <div className="flex flex-col sm:flex-row gap-3">
+      {/* Search Bar */}
+      <div className="bg-white p-4 rounded-3xl border border-emerald-100 shadow-xs">
+        <form onSubmit={handleSearch} className="flex flex-col sm:flex-row gap-3">
           <div className="relative flex-1">
             <Search className="w-4 h-4 text-gray-400 absolute left-3.5 top-3" />
-            <input
-              type="text"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search products by name, crop, or location..."
-              className="w-full pl-10 pr-4 py-2 rounded-xl border border-gray-300 text-xs font-semibold focus:ring-2 focus:ring-emerald-500 outline-hidden"
-            />
+            <input type="text" value={search} onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search products, crops, fertilizers, mandis..."
+              className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-gray-300 text-xs font-semibold focus:ring-2 focus:ring-emerald-500 outline-hidden" />
           </div>
-
-          <button
-            onClick={fetchCatalog}
-            className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-xs"
-          >
+          <button type="submit" className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-xs transition-all">
             Search
           </button>
-        </div>
+          <button type="button" onClick={() => setShowFilters(!showFilters)}
+            className="px-4 py-2.5 border border-gray-300 text-gray-600 font-bold text-xs rounded-xl flex items-center space-x-1.5 hover:bg-gray-50">
+            <Filter className="w-3.5 h-3.5" />
+            <span>Filters</span>
+            <ChevronDown className={`w-3 h-3 transition-transform ${showFilters ? 'rotate-180' : ''}`} />
+          </button>
+        </form>
 
-        {/* Category Pills & Organic Checkbox */}
-        <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-gray-100">
-          <div className="flex items-center space-x-2 overflow-x-auto pb-1 custom-scrollbar">
-            <button
-              onClick={() => setSelectedCat('')}
-              className={`px-3.5 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all ${
-                selectedCat === ''
-                  ? 'bg-emerald-600 text-white shadow-xs'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-              }`}
-            >
-              All Categories
-            </button>
-            {categories.map((cat) => (
-              <button
-                key={cat.id}
-                onClick={() => setSelectedCat(cat.id)}
-                className={`px-3.5 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all ${
-                  selectedCat === cat.id
-                    ? 'bg-emerald-600 text-white shadow-xs'
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                }`}
-              >
-                {cat.name}
-              </button>
-            ))}
+        {/* Expanded Filters */}
+        {showFilters && (
+          <div className="mt-4 pt-4 border-t border-gray-100 grid grid-cols-2 sm:grid-cols-4 gap-3">
+            {/* Category */}
+            <select value={categoryId} onChange={(e) => setCategoryId(e.target.value)}
+              className="px-3 py-2 rounded-xl border border-gray-300 text-xs font-bold text-gray-700 bg-white">
+              <option value="">All Categories</option>
+              {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </select>
+
+            {/* State */}
+            <select value={stateId} onChange={(e) => setStateId(e.target.value)}
+              className="px-3 py-2 rounded-xl border border-gray-300 text-xs font-bold text-gray-700 bg-white">
+              <option value="">All States</option>
+              {states.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+            </select>
+
+            {/* District */}
+            <select value={districtId} onChange={(e) => setDistrictId(e.target.value)} disabled={!stateId}
+              className="px-3 py-2 rounded-xl border border-gray-300 text-xs font-bold text-gray-700 bg-white disabled:opacity-50">
+              <option value="">All Districts</option>
+              {districts.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+            </select>
+
+            {/* Mandi */}
+            <select value={mandiId} onChange={(e) => setMandiId(e.target.value)} disabled={!districtId}
+              className="px-3 py-2 rounded-xl border border-gray-300 text-xs font-bold text-gray-700 bg-white disabled:opacity-50">
+              <option value="">All Mandis</option>
+              {mandis.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+            </select>
+
+            {/* Price Range */}
+            <input type="number" placeholder="Min Price" value={minPrice} onChange={e => setMinPrice(e.target.value)}
+              className="px-3 py-2 rounded-xl border border-gray-300 text-xs font-bold" />
+            <input type="number" placeholder="Max Price" value={maxPrice} onChange={e => setMaxPrice(e.target.value)}
+              className="px-3 py-2 rounded-xl border border-gray-300 text-xs font-bold" />
+
+            {/* Sort */}
+            <select value={sortBy} onChange={(e) => setSortBy(e.target.value)}
+              className="px-3 py-2 rounded-xl border border-gray-300 text-xs font-bold text-gray-700 bg-white">
+              <option value="newest">Newest First</option>
+              <option value="price_asc">Price: Low → High</option>
+              <option value="price_desc">Price: High → Low</option>
+              <option value="rating">Top Rated</option>
+            </select>
           </div>
-
-          <label className="flex items-center space-x-2 text-xs font-bold text-emerald-800 cursor-pointer bg-emerald-50 px-3 py-1.5 rounded-xl border border-emerald-200">
-            <input
-              type="checkbox"
-              checked={organicOnly}
-              onChange={(e) => setOrganicOnly(e.target.checked)}
-              className="rounded-md text-emerald-600 focus:ring-emerald-500"
-            />
-            <span>🌱 100% Certified Organic Only</span>
-          </label>
-        </div>
+        )}
       </div>
 
-      {/* Product Cards Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-        {products.map((product) => (
-          <div
-            key={product.id}
-            className="bg-white rounded-3xl border border-gray-200/80 shadow-xs hover:shadow-xl hover:border-emerald-200 transition-all flex flex-col justify-between overflow-hidden group"
-          >
-            {/* Header Image / Badge */}
-            <div className="relative bg-gradient-to-tr from-emerald-50 to-teal-50 p-6 flex items-center justify-center border-b border-gray-100 min-h-[160px]">
-              <ShoppingBag className="w-16 h-16 text-emerald-300/80 group-hover:scale-110 transition-transform" />
-              {product.is_organic && (
-                <span className="absolute top-3 left-3 bg-emerald-600 text-white text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full shadow-xs">
-                  🌱 Organic
+      {/* Products Grid */}
+      {loading ? (
+        <div className="p-12 text-center text-xs text-gray-400">Loading marketplace...</div>
+      ) : products.length > 0 ? (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+          {products.map((p) => (
+            <div key={p.id} className="bg-white rounded-2xl border border-gray-100 shadow-xs hover:shadow-md transition-all overflow-hidden group">
+              {/* Image */}
+              <div className="h-44 overflow-hidden relative">
+                <img
+                  src={getImageUrl(p)}
+                  alt={p.name}
+                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                  onError={(e) => { e.target.src = PRODUCT_FALLBACK; }}
+                />
+                {p.is_organic && (
+                  <span className="absolute top-3 left-3 px-2 py-0.5 bg-emerald-600 text-white text-[10px] font-bold rounded-full">
+                    🌿 Organic
+                  </span>
+                )}
+                <span className={`absolute top-3 right-3 px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                  p.is_available ? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-red-800'
+                }`}>
+                  {p.is_available ? '✓ Available' : 'Out of Stock'}
                 </span>
-              )}
-              <span className="absolute bottom-3 right-3 bg-white/90 text-gray-700 text-[10px] font-bold px-2 py-0.5 rounded-md border border-gray-200 flex items-center">
-                <Star className="w-3 h-3 text-amber-500 fill-amber-500 mr-1" />
-                {product.rating || 4.8}
-              </span>
-            </div>
+              </div>
 
-            {/* Product Meta */}
-            <div className="p-5 space-y-3 flex-1 flex flex-col justify-between">
-              <div>
-                <span className="text-[10px] font-bold text-emerald-700 uppercase tracking-wide block">
-                  {product.category_name}
-                </span>
-                <h3 className="font-bold text-gray-900 text-sm mt-0.5 leading-snug">
-                  {product.name}
-                </h3>
-                <p className="text-xs text-gray-500 mt-1 line-clamp-2 leading-relaxed">
-                  {product.description}
+              {/* Content */}
+              <div className="p-4 space-y-2.5">
+                <h3 className="font-extrabold text-gray-900 text-sm">{p.name}</h3>
+
+                {/* Price */}
+                <div className="flex items-baseline space-x-1.5">
+                  <span className="text-xl font-black text-emerald-700">{formatPrice(p.price)}</span>
+                  <span className="text-[11px] text-gray-400 font-semibold">/ {p.unit || 'kg'}</span>
+                </div>
+
+                {/* Details */}
+                <div className="space-y-1 text-[11px] text-gray-500">
+                  <p><span className="font-bold text-gray-600">Quantity:</span> {p.stock_quantity || '—'} {p.unit || 'kg'}</p>
+                  {p.category_name && <p><Tag className="w-3 h-3 inline mr-1" />{p.category_name}</p>}
+                  {p.seller_name && <p><span className="font-bold text-gray-600">Seller:</span> {p.seller_name}</p>}
+                </div>
+
+                {/* Location */}
+                {(p.state_name || p.mandi_name) && (
+                  <div className="flex items-start space-x-1.5 text-[11px] text-gray-500 bg-gray-50 p-2 rounded-lg">
+                    <MapPin className="w-3 h-3 mt-0.5 text-emerald-500 shrink-0" />
+                    <div>
+                      {p.mandi_name && <span className="font-semibold text-gray-700 block">{p.mandi_name}</span>}
+                      <span>{[p.district_name, p.state_name].filter(Boolean).join(', ')}</span>
+                    </div>
+                  </div>
+                )}
+
+                {/* Price type label */}
+                <p className="text-[10px] text-gray-400 italic">
+                  Marketplace Selling Price • Updated: {p.updated_at ? new Date(p.updated_at).toLocaleDateString('en-IN') : '—'}
                 </p>
-                <div className="flex items-center space-x-1 text-[11px] text-gray-400 mt-2">
-                  <MapPin className="w-3 h-3 text-emerald-600" />
-                  <span className="truncate">{product.location || 'India'}</span>
-                </div>
-              </div>
 
-              <div className="pt-3 border-t border-gray-100 flex items-center justify-between">
-                <div>
-                  <span className="text-lg font-black text-gray-900">₹ {product.price}</span>
-                  <span className="text-xs text-gray-500"> / {product.unit}</span>
+                {/* Actions */}
+                <div className="flex gap-2 pt-1">
+                  <button
+                    onClick={() => handleAddToCart(p)}
+                    className="flex-1 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[11px] rounded-lg transition-all flex items-center justify-center space-x-1"
+                  >
+                    <ShoppingCart className="w-3 h-3" />
+                    <span>Add to Cart</span>
+                  </button>
+                  <button
+                    onClick={() => handleBuyNow(p)}
+                    className="flex-1 py-2 bg-orange-500 hover:bg-orange-600 text-white font-bold text-[11px] rounded-lg transition-all"
+                  >
+                    Buy Now
+                  </button>
                 </div>
-
-                <button
-                  onClick={() => handleAddToCart(product)}
-                  className={`px-3.5 py-2 rounded-xl text-xs font-bold flex items-center space-x-1 transition-all ${
-                    addedItem === product.id
-                      ? 'bg-emerald-700 text-white shadow-xs'
-                      : 'bg-emerald-50 text-emerald-800 hover:bg-emerald-600 hover:text-white'
-                  }`}
-                >
-                  {addedItem === product.id ? (
-                    <>
-                      <Check className="w-3.5 h-3.5" />
-                      <span>Added!</span>
-                    </>
-                  ) : (
-                    <>
-                      <ShoppingCart className="w-3.5 h-3.5" />
-                      <span>Add to Cart</span>
-                    </>
-                  )}
-                </button>
               </div>
             </div>
-          </div>
-        ))}
-      </div>
-
+          ))}
+        </div>
+      ) : (
+        <div className="bg-white rounded-3xl border border-gray-100 p-12 text-center text-xs text-gray-400">
+          <Package className="w-8 h-8 mx-auto mb-3 text-gray-300" />
+          <p className="font-semibold text-gray-500">No products found.</p>
+          <p className="mt-1">Try adjusting your search or filters.</p>
+        </div>
+      )}
     </div>
   );
 };

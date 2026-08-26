@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { TrendingUp, Plus, Trash2, Edit3, X, ArrowUpRight, ArrowDownRight, Minus, Building2, Globe, Map } from 'lucide-react';
+import { TrendingUp, Plus, Trash2, Edit3, X, ArrowUpRight, ArrowDownRight, Minus, Building2, Globe, Map, RefreshCw } from 'lucide-react';
 import api from '../../services/api';
 
 const inputClass = "w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-xl text-xs text-white outline-none focus:ring-1 focus:ring-emerald-500";
@@ -93,13 +93,16 @@ export const AdminMarketPrices = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [syncing, setSyncing] = useState(false);
+  const [syncResult, setSyncResult] = useState(null);
+  const [syncStatus, setSyncStatus] = useState(null);
 
   const emptyForm = () => ({
     _state_id: '', _district_id: '',
-    mandi_id: '', crop_id: '', crop_name: 'Wheat',
-    variety: 'Standard FAQ',
-    min_price: 2200.0, max_price: 2450.0, modal_price: 2350.0,
-    unit: '₹/Quintal', trend: 'UP', change_percent: 2.5
+    mandi_id: '', crop_id: '', crop_name: '',
+    variety: 'Standard',
+    min_price: '', max_price: '', modal_price: '',
+    unit: 'Quintal', trend: 'STABLE', change_percent: 0
   });
 
   const [formData, setFormData] = useState(emptyForm());
@@ -107,12 +110,14 @@ export const AdminMarketPrices = () => {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [pRes, cRes] = await Promise.all([
+      const [pRes, cRes, sRes] = await Promise.all([
         api.get('/admin/market-prices'),
-        api.get('/crops')
+        api.get('/crops'),
+        api.get('/admin/market-prices/sync-status').catch(() => ({ data: null }))
       ]);
       setPrices(pRes.data || []);
       setCrops(cRes.data || []);
+      setSyncStatus(sRes.data);
     } catch (err) {
       console.error("Failed to load:", err);
     } finally {
@@ -121,6 +126,20 @@ export const AdminMarketPrices = () => {
   };
 
   useEffect(() => { fetchData(); }, []);
+
+  const handleSync = async () => {
+    setSyncing(true);
+    setSyncResult(null);
+    try {
+      const res = await api.post('/admin/market-prices/sync?limit=500');
+      setSyncResult(res.data);
+      fetchData(); // Refresh prices after sync
+    } catch (err) {
+      setSyncResult({ status: 'failed', error: err?.response?.data?.detail || 'Sync request failed.' });
+    } finally {
+      setSyncing(false);
+    }
+  };
 
   const openCreateModal = () => {
     setEditingItem(null);
@@ -190,11 +209,58 @@ export const AdminMarketPrices = () => {
             Daily APMC mandi prices linked to State → District → Mandi hierarchy
           </p>
         </div>
-        <button onClick={openCreateModal}
-          className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-md transition-all flex items-center gap-1.5">
-          <Plus className="w-4 h-4" /> Add Price Entry
-        </button>
+        <div className="flex items-center gap-2">
+          <button onClick={handleSync} disabled={syncing}
+            className="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-bold text-xs rounded-xl shadow-md transition-all flex items-center gap-1.5">
+            <RefreshCw className={`w-4 h-4 ${syncing ? 'animate-spin' : ''}`} />
+            {syncing ? 'Syncing...' : 'Sync Market Prices Now'}
+          </button>
+          <button onClick={openCreateModal}
+            className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-md transition-all flex items-center gap-1.5">
+            <Plus className="w-4 h-4" /> Add Price Entry
+          </button>
+        </div>
       </div>
+
+      {/* Sync Status Panel */}
+      {(syncStatus || syncResult) && (
+        <div className="bg-slate-900/80 rounded-2xl border border-slate-800 p-4 text-xs text-slate-300">
+          <div className="flex flex-wrap items-center gap-4">
+            <div className="flex items-center gap-1.5">
+              <span className="font-bold text-slate-400">Source:</span>
+              <span>{syncStatus?.data_source || 'data.gov.in'}</span>
+            </div>
+            {syncStatus?.last_sync && (
+              <div className="flex items-center gap-1.5">
+                <span className="font-bold text-slate-400">Last Sync:</span>
+                <span>{new Date(syncStatus.last_sync).toLocaleString('en-IN')}</span>
+              </div>
+            )}
+            <div className={`px-2 py-0.5 rounded-full font-bold text-[10px] ${
+              syncStatus?.status === 'success' ? 'bg-emerald-900/50 text-emerald-400' :
+              syncStatus?.status === 'no_api_key' ? 'bg-amber-900/50 text-amber-400' :
+              'bg-slate-800 text-slate-400'
+            }`}>
+              {syncStatus?.status === 'success' ? '✓ Synced' :
+               syncStatus?.status === 'no_api_key' ? '⚠ API Key Required' :
+               syncStatus?.status || 'Not Yet Synced'}
+            </div>
+          </div>
+          {syncResult && (
+            <div className={`mt-3 p-3 rounded-xl text-[11px] ${
+              syncResult.status === 'success' ? 'bg-emerald-950/50 text-emerald-300' :
+              syncResult.status === 'no_api_key' ? 'bg-amber-950/50 text-amber-300' :
+              'bg-red-950/50 text-red-300'
+            }`}>
+              <p className="font-bold">{syncResult.message || syncResult.status}</p>
+              {syncResult.records_fetched !== undefined && (
+                <p className="mt-1">Fetched: {syncResult.records_fetched} | Added: {syncResult.records_added} | Updated: {syncResult.records_updated}</p>
+              )}
+              {syncResult.error && <p className="mt-1 opacity-80">{syncResult.error}</p>}
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="bg-slate-900/80 rounded-3xl border border-slate-800 shadow-md overflow-hidden">
         {loading ? (

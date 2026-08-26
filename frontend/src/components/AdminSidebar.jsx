@@ -19,7 +19,9 @@ import {
   Mail,
   Settings,
   ChevronRight,
-  X
+  X,
+  MapPin,
+  RefreshCw
 } from 'lucide-react';
 
 export const AdminSidebar = ({ isOpen = false, onClose = () => {} }) => {
@@ -29,7 +31,8 @@ export const AdminSidebar = ({ isOpen = false, onClose = () => {} }) => {
     { to: "/admin/crops", label: "Crops Management", icon: Sprout },
     { to: "/admin/fertilizers", label: "Fertilizer Directory", icon: FlaskConical },
     { to: "/admin/diseases", label: "Disease Pathology", icon: Bug },
-    { to: "/admin/farming-tips", label: "Farming Tips / GAP", icon: Lightbulb },
+    { to: "/admin/tips", label: "Farming Tips / GAP", icon: Lightbulb },
+    { to: "/admin/locations", label: "States / Districts / Mandis", icon: MapPin },
     { to: "/admin/market-prices", label: "Mandi Price Feed", icon: TrendingUp },
     { to: "/admin/markets", label: "Markets / APMCs", icon: Store },
     { to: "/admin/products", label: "Marketplace Products", icon: Package },

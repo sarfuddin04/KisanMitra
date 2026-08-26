@@ -1,6 +1,7 @@
 import React from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth } from './context/AuthContext';
+import { LoginRequiredModal } from './components/LoginRequiredModal';
 
 // Layouts
 import { PublicLayout } from './layouts/PublicLayout';
@@ -34,6 +35,7 @@ import { OrdersPage } from './pages/farmer/OrdersPage';
 import { MyProductsPage } from './pages/farmer/MyProductsPage';
 import { NotificationsPage } from './pages/farmer/NotificationsPage';
 import { ProfilePage } from './pages/farmer/ProfilePage';
+import { MandiDetailPage } from './pages/farmer/MandiDetailPage';
 
 // Admin Pages
 import { AdminLogin } from './pages/admin/AdminLogin';
@@ -78,80 +80,108 @@ const AdminRoute = ({ children }) => {
   return children;
 };
 
+/**
+ * OptionalAuthLayout — Pages that can be viewed without login
+ * but still show the FarmerLayout if logged in, or PublicLayout if guest.
+ */
+const BrowseLayout = () => {
+  const { isAuthenticated } = useAuth();
+  return isAuthenticated ? <FarmerLayout /> : <PublicLayout />;
+};
+
 export function App() {
+  const { loginModalOpen, loginModalMessage, loginModalReturnTo, closeLoginModal } = useAuth();
+
   return (
-    <Routes>
-      {/* Public Routes */}
-      <Route element={<PublicLayout />}>
-        <Route path="/" element={<Home />} />
-        <Route path="/about" element={<About />} />
-        <Route path="/features" element={<Features />} />
-        <Route path="/services" element={<Services />} />
-        <Route path="/contact" element={<Contact />} />
-        <Route path="/login" element={<Login />} />
-        <Route path="/register" element={<Register />} />
-      </Route>
+    <>
+      {/* Global Login Required Modal */}
+      <LoginRequiredModal
+        isOpen={loginModalOpen}
+        onClose={closeLoginModal}
+        message={loginModalMessage}
+        returnTo={loginModalReturnTo}
+      />
 
-      {/* Admin Login */}
-      <Route path="/admin/login" element={<AdminLogin />} />
+      <Routes>
+        {/* Public Routes */}
+        <Route element={<PublicLayout />}>
+          <Route path="/" element={<Home />} />
+          <Route path="/about" element={<About />} />
+          <Route path="/features" element={<Features />} />
+          <Route path="/services" element={<Services />} />
+          <Route path="/contact" element={<Contact />} />
+          <Route path="/login" element={<Login />} />
+          <Route path="/register" element={<Register />} />
+        </Route>
 
-      {/* Farmer Protected Routes */}
-      <Route
-        element={
-          <FarmerRoute>
-            <FarmerLayout />
-          </FarmerRoute>
-        }
-      >
-        <Route path="/dashboard" element={<Dashboard />} />
-        <Route path="/crop-recommendation" element={<CropRecommendation />} />
-        <Route path="/crop-history" element={<CropHistory />} />
-        <Route path="/disease-detection" element={<DiseaseDetection />} />
-        <Route path="/disease-history" element={<DiseaseHistory />} />
-        <Route path="/fertilizer-recommendation" element={<FertilizerRecommendation />} />
-        <Route path="/weather" element={<WeatherPage />} />
-        <Route path="/market-prices" element={<MarketPricesPage />} />
-        <Route path="/farming-tips" element={<FarmingTipsPage />} />
-        <Route path="/ai-assistant" element={<AIAssistantPage />} />
-        <Route path="/marketplace" element={<MarketplacePage />} />
-        <Route path="/cart" element={<CartPage />} />
-        <Route path="/checkout" element={<CheckoutPage />} />
-        <Route path="/orders" element={<OrdersPage />} />
-        <Route path="/my-products" element={<MyProductsPage />} />
-        <Route path="/notifications" element={<NotificationsPage />} />
-        <Route path="/profile" element={<ProfilePage />} />
-      </Route>
+        {/* ===== GUEST-BROWSABLE ROUTES ===== */}
+        {/* These pages can be viewed without login. */}
+        {/* Shows FarmerLayout if logged in, PublicLayout if guest. */}
+        <Route element={<BrowseLayout />}>
+          <Route path="/marketplace" element={<MarketplacePage />} />
+          <Route path="/market-prices" element={<MarketPricesPage />} />
+          <Route path="/mandis/:id" element={<MandiDetailPage />} />
+        </Route>
 
-      {/* Admin Protected Routes */}
-      <Route
-        element={
-          <AdminRoute>
-            <AdminLayout />
-          </AdminRoute>
-        }
-      >
-        <Route path="/admin/dashboard" element={<AdminDashboard />} />
-        <Route path="/admin/users" element={<AdminUsers />} />
-        <Route path="/admin/crops" element={<AdminCrops />} />
-        <Route path="/admin/fertilizers" element={<AdminFertilizers />} />
-        <Route path="/admin/diseases" element={<AdminDiseases />} />
-        <Route path="/admin/tips" element={<AdminTips />} />
-        <Route path="/admin/market-prices" element={<AdminMarketPrices />} />
-        <Route path="/admin/markets" element={<AdminMarkets />} />
-        <Route path="/admin/products" element={<AdminProducts />} />
-        <Route path="/admin/categories" element={<AdminCategories />} />
-        <Route path="/admin/orders" element={<AdminOrders />} />
-        <Route path="/admin/notifications" element={<AdminNotifications />} />
-        <Route path="/admin/banners" element={<AdminBanners />} />
-        <Route path="/admin/faqs" element={<AdminFAQs />} />
-        <Route path="/admin/contacts" element={<AdminContacts />} />
-        <Route path="/admin/settings" element={<AdminSettings />} />
-        <Route path="/admin/locations" element={<AdminLocations />} />
-      </Route>
+        {/* Admin Login */}
+        <Route path="/admin/login" element={<AdminLogin />} />
 
-      {/* Fallback Catch-all */}
-      <Route path="*" element={<Navigate to="/" replace />} />
-    </Routes>
+        {/* Farmer Protected Routes — require login */}
+        <Route
+          element={
+            <FarmerRoute>
+              <FarmerLayout />
+            </FarmerRoute>
+          }
+        >
+          <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/crop-recommendation" element={<CropRecommendation />} />
+          <Route path="/crop-history" element={<CropHistory />} />
+          <Route path="/disease-detection" element={<DiseaseDetection />} />
+          <Route path="/disease-history" element={<DiseaseHistory />} />
+          <Route path="/fertilizer-recommendation" element={<FertilizerRecommendation />} />
+          <Route path="/weather" element={<WeatherPage />} />
+          <Route path="/farming-tips" element={<FarmingTipsPage />} />
+          <Route path="/ai-assistant" element={<AIAssistantPage />} />
+          <Route path="/cart" element={<CartPage />} />
+          <Route path="/checkout" element={<CheckoutPage />} />
+          <Route path="/orders" element={<OrdersPage />} />
+          <Route path="/my-products" element={<MyProductsPage />} />
+          <Route path="/notifications" element={<NotificationsPage />} />
+          <Route path="/profile" element={<ProfilePage />} />
+        </Route>
+
+        {/* Admin Protected Routes */}
+        <Route
+          element={
+            <AdminRoute>
+              <AdminLayout />
+            </AdminRoute>
+          }
+        >
+          <Route path="/admin/dashboard" element={<AdminDashboard />} />
+          <Route path="/admin/users" element={<AdminUsers />} />
+          <Route path="/admin/crops" element={<AdminCrops />} />
+          <Route path="/admin/fertilizers" element={<AdminFertilizers />} />
+          <Route path="/admin/diseases" element={<AdminDiseases />} />
+          <Route path="/admin/tips" element={<AdminTips />} />
+          <Route path="/admin/market-prices" element={<AdminMarketPrices />} />
+          <Route path="/admin/markets" element={<AdminMarkets />} />
+          <Route path="/admin/products" element={<AdminProducts />} />
+          <Route path="/admin/categories" element={<AdminCategories />} />
+          <Route path="/admin/orders" element={<AdminOrders />} />
+          <Route path="/admin/notifications" element={<AdminNotifications />} />
+          <Route path="/admin/banners" element={<AdminBanners />} />
+          <Route path="/admin/faqs" element={<AdminFAQs />} />
+          <Route path="/admin/contacts" element={<AdminContacts />} />
+          <Route path="/admin/settings" element={<AdminSettings />} />
+          <Route path="/admin/locations" element={<AdminLocations />} />
+        </Route>
+
+        {/* Fallback Catch-all */}
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </>
   );
 }
 

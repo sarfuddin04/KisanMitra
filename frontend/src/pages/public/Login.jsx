@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Sprout,
   Lock,
@@ -23,6 +23,8 @@ export const Login = () => {
   const { login } = useAuth();
   const { t } = useLanguage();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const returnTo = searchParams.get('returnTo');
 
   const [email, setEmail] = useState(() => {
     return localStorage.getItem('kisanmitra_remembered_email') || '';
@@ -67,7 +69,9 @@ export const Login = () => {
       setSuccessMsg('Authentication successful! Directing to your portal...');
 
       setTimeout(() => {
-        if (userData.role === 'ADMIN' || userData.role_name === 'ADMIN') {
+        if (returnTo) {
+          navigate(returnTo);
+        } else if (userData.role === 'ADMIN' || userData.role_name === 'ADMIN') {
           navigate('/admin/dashboard');
         } else {
           navigate('/dashboard');

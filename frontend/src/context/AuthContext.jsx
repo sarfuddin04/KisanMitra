@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import api from '../services/api';
 
 const AuthContext = createContext();
@@ -10,6 +10,11 @@ export const AuthProvider = ({ children }) => {
   });
   const [token, setToken] = useState(() => localStorage.getItem('kisanmitra_token'));
   const [loading, setLoading] = useState(true);
+
+  // Login Required Modal state (global)
+  const [loginModalOpen, setLoginModalOpen] = useState(false);
+  const [loginModalMessage, setLoginModalMessage] = useState('');
+  const [loginModalReturnTo, setLoginModalReturnTo] = useState('');
 
   useEffect(() => {
     const fetchMe = async () => {
@@ -60,6 +65,32 @@ export const AuthProvider = ({ children }) => {
     localStorage.setItem('kisanmitra_user', JSON.stringify(updatedUser));
   };
 
+  /**
+   * requireAuth - Call this before any action that needs login.
+   * If user is logged in, returns true immediately.
+   * If not, opens the Login Required modal and returns false.
+   * 
+   * Usage:
+   *   const { requireAuth } = useAuth();
+   *   const handleAddToCart = () => {
+   *     if (!requireAuth('Please login to add items to cart.')) return;
+   *     // ... proceed with add to cart
+   *   };
+   */
+  const requireAuth = useCallback((message, returnTo) => {
+    if (token && user) return true;
+    setLoginModalMessage(message || 'Please login or create an account to continue.');
+    setLoginModalReturnTo(returnTo || window.location.pathname);
+    setLoginModalOpen(true);
+    return false;
+  }, [token, user]);
+
+  const closeLoginModal = useCallback(() => {
+    setLoginModalOpen(false);
+    setLoginModalMessage('');
+    setLoginModalReturnTo('');
+  }, []);
+
   const isAuthenticated = !!token && !!user;
   const isFarmer = isAuthenticated && (user?.role_name === 'FARMER' || user?.role === 'FARMER');
   const isAdmin = isAuthenticated && (user?.role_name === 'ADMIN' || user?.role === 'ADMIN');
@@ -76,7 +107,13 @@ export const AuthProvider = ({ children }) => {
         updateUserData,
         isAuthenticated,
         isFarmer,
-        isAdmin
+        isAdmin,
+        // Guest auth helpers
+        requireAuth,
+        loginModalOpen,
+        loginModalMessage,
+        loginModalReturnTo,
+        closeLoginModal,
       }}
     >
       {children}

@@ -287,7 +287,87 @@ def delete_fertilizer(fert_id: int, db: Session = Depends(get_db)):
     db.commit()
     return {"message": "Fertilizer deleted successfully."}
 
+
+@router.put("/fertilizers/{fert_id}/price")
+def update_fertilizer_price(
+    fert_id: int,
+    req: dict,
+    db: Session = Depends(get_db),
+    current_admin: User = Depends(require_admin)
+):
+    """
+    Admin sets/updates the fertilizer price.
+    NOTE: This is an ADMIN_ENTRY price — not from any live official API.
+    Frontend must always display this as 'Price updated on: DATE' and never 'LIVE'.
+    """
+    from app.models.agronomy import FertilizerPrice
+    f = db.query(Fertilizer).filter(Fertilizer.id == fert_id).first()
+    if not f:
+        raise HTTPException(status_code=404, detail="Fertilizer not found.")
+
+    price = float(req.get("price", 0))
+    unit = req.get("unit", f.price_unit or "50kg bag")
+    notes = req.get("notes", "")
+    state = req.get("state")
+    district = req.get("district")
+
+    # Update current price on fertilizer
+    f.current_price = price
+    f.price_unit = unit
+    f.price_updated_at = datetime.datetime.utcnow()
+    f.price_source = "admin_entry"
+
+    # Record in price history
+    fp = FertilizerPrice(
+        fertilizer_id=fert_id,
+        fertilizer_name=f.name,
+        price=price,
+        unit=unit,
+        state=state,
+        district=district,
+        price_type="ADMIN_ENTRY",
+        entered_by=current_admin.id,
+        notes=notes,
+    )
+    db.add(fp)
+    db.commit()
+
+    return {
+        "message": "Price updated.",
+        "fertilizer": f.name,
+        "price": price,
+        "unit": unit,
+        "price_type": "ADMIN_ENTRY",
+        "updated_at": f.price_updated_at.isoformat() if f.price_updated_at else None,
+        "disclaimer": "This is a manually entered price. Not from any official live API."
+    }
+
+
+@router.get("/fertilizers/{fert_id}/prices")
+def get_fertilizer_price_history(fert_id: int, db: Session = Depends(get_db)):
+    """Get price history for a fertilizer."""
+    from app.models.agronomy import FertilizerPrice
+    rows = db.query(FertilizerPrice).filter(
+        FertilizerPrice.fertilizer_id == fert_id
+    ).order_by(FertilizerPrice.price_date.desc()).limit(50).all()
+    return [
+        {
+            "id": r.id,
+            "price": r.price,
+            "unit": r.unit,
+            "state": r.state,
+            "district": r.district,
+            "price_type": r.price_type,
+            "notes": r.notes,
+            "price_date": r.price_date,
+            "disclaimer": "Manually entered price. Not from any official live source.",
+        }
+        for r in rows
+    ]
+
+
 # ==================== 5. DISEASES ====================
+
 @router.get("/diseases", response_model=List[DiseaseOut])
 def get_all_diseases(db: Session = Depends(get_db)):
     return db.query(Disease).order_by(Disease.name.asc()).all()
@@ -868,3 +948,221 @@ def admin_update_fertilizer_image(fert_id: int, image_url: str, db: Session = De
     f.image_url = image_url
     db.commit()
     return {"message": "Fertilizer image updated.", "image_url": image_url}
+
+
+# ==================== 21. MARKET PRICE SYNC ====================
+
+@router.post("/market-prices/sync")
+def admin_sync_market_prices(
+    state_filter: Optional[str] = Query(None),
+    limit: int = Query(500, ge=10, le=2000),
+    db: Session = Depends(get_db)
+):
+    """
+    Manually trigger market price sync from official data source (data.gov.in).
+    This pulls real AGMARKNET data — never fabricates prices.
+    """
+    from app.services.market_sync import sync_market_prices
+    log = sync_market_prices(db, sync_type="manual", state_filter=state_filter, limit=limit)
+    return {
+        "message": f"Sync {log.status}",
+        "status": log.status,
+        "records_fetched": log.records_fetched,
+        "records_added": log.records_added,
+        "records_updated": log.records_updated,
+        "error": log.error_message,
+        "started_at": str(log.started_at) if log.started_at else None,
+        "finished_at": str(log.finished_at) if log.finished_at else None,
+    }
+
+
+@router.get("/market-prices/sync-status")
+def admin_sync_status(db: Session = Depends(get_db)):
+    """Get latest sync status for admin dashboard display."""
+    from app.services.market_sync import get_last_sync_status
+    return get_last_sync_status(db)
+
+
+# ==================== 22. PRODUCT MANAGEMENT (Admin) ====================
+
+@router.get("/products")
+def admin_list_products(
+    search: Optional[str] = Query(None),
+    status: Optional[str] = Query(None),
+    category_id: Optional[int] = Query(None),
+    limit: int = Query(200, ge=1, le=1000),
+    db: Session = Depends(get_db)
+):
+    """Admin can see ALL products regardless of status."""
+    from app.models.marketplace import ProductImage
+    from sqlalchemy.orm import joinedload
+    q = db.query(Product).options(
+        joinedload(Product.seller),
+        joinedload(Product.category),
+        joinedload(Product.images),
+        joinedload(Product.state),
+        joinedload(Product.district),
+        joinedload(Product.mandi),
+    )
+    if search:
+        q = q.filter(
+            Product.name.ilike(f"%{search}%") |
+            Product.location.ilike(f"%{search}%") |
+            Product.state_name.ilike(f"%{search}%") |
+            Product.district_name.ilike(f"%{search}%") |
+            Product.mandi_name.ilike(f"%{search}%")
+        )
+    if status:
+        q = q.filter(Product.status == status)
+    if category_id:
+        q = q.filter(Product.category_id == category_id)
+    products = q.order_by(Product.created_at.desc()).limit(limit).all()
+
+    result = []
+    for p in products:
+        primary_image = p.image_url
+        if p.images:
+            for img in p.images:
+                if img.is_primary:
+                    primary_image = img.image_url
+        result.append({
+            "id": p.id,
+            "name": p.name,
+            "description": p.description,
+            "price": p.price,
+            "unit": p.unit,
+            "stock_quantity": p.stock_quantity,
+            "location": p.location,
+            "category_id": p.category_id,
+            "category_name": p.category.name if p.category else None,
+            "seller_id": p.seller_id,
+            "seller_name": p.seller.full_name if p.seller else None,
+            "state_id": p.state_id,
+            "state_name": p.state_name or (p.state.name if p.state else None),
+            "district_id": p.district_id,
+            "district_name": p.district_name or (p.district.name if p.district else None),
+            "mandi_id": p.mandi_id,
+            "mandi_name": p.mandi_name or (p.mandi.name if p.mandi else None),
+            "image_url": primary_image,
+            "is_available": p.is_available,
+            "is_organic": p.is_organic,
+            "status": p.status,
+            "rating": p.rating,
+            "created_at": p.created_at,
+            "updated_at": p.updated_at,
+        })
+    return result
+
+
+@router.get("/products/{product_id}")
+def admin_get_product(product_id: int, db: Session = Depends(get_db)):
+    from sqlalchemy.orm import joinedload
+    p = db.query(Product).options(
+        joinedload(Product.seller), joinedload(Product.category), joinedload(Product.images)
+    ).filter(Product.id == product_id).first()
+    if not p:
+        raise HTTPException(status_code=404, detail="Product not found.")
+    return {"id": p.id, "name": p.name, "price": p.price, "unit": p.unit,
+            "status": p.status, "image_url": p.image_url}
+
+
+@router.put("/products/{product_id}")
+def admin_edit_product(product_id: int, req: dict, db: Session = Depends(get_db)):
+    from app.models.market import State, District, Mandi
+    p = db.query(Product).filter(Product.id == product_id).first()
+    if not p:
+        raise HTTPException(status_code=404, detail="Product not found.")
+
+    updatable = [
+        "name", "description", "price", "unit", "stock_quantity", "location",
+        "image_url", "is_available", "is_organic", "category_id", "status",
+        "state_id", "district_id", "mandi_id",
+    ]
+    for k in updatable:
+        if k in req:
+            setattr(p, k, req[k])
+
+    if req.get("state_id"):
+        s = db.query(State).filter(State.id == req["state_id"]).first()
+        p.state_name = s.name if s else None
+    if req.get("district_id"):
+        d = db.query(District).filter(District.id == req["district_id"]).first()
+        p.district_name = d.name if d else None
+    if req.get("mandi_id"):
+        m = db.query(Mandi).filter(Mandi.id == req["mandi_id"]).first()
+        p.mandi_name = m.name if m else None
+
+    db.commit()
+    db.refresh(p)
+    return {"message": "Product updated.", "id": p.id}
+
+
+@router.delete("/products/{product_id}")
+def admin_delete_product(product_id: int, db: Session = Depends(get_db)):
+    p = db.query(Product).filter(Product.id == product_id).first()
+    if not p:
+        raise HTTPException(status_code=404, detail="Product not found.")
+    db.delete(p)
+    db.commit()
+    return {"message": "Product deleted."}
+
+
+# ==================== 22b. PRODUCT APPROVAL ====================
+
+
+@router.put("/products/{product_id}/approve")
+def admin_approve_product(product_id: int, db: Session = Depends(get_db)):
+    p = db.query(Product).filter(Product.id == product_id).first()
+    if not p:
+        raise HTTPException(status_code=404, detail="Product not found.")
+    p.status = "APPROVED"
+    p.is_available = True
+    db.commit()
+    return {"message": "Product approved.", "status": "APPROVED"}
+
+
+@router.put("/products/{product_id}/reject")
+def admin_reject_product(product_id: int, db: Session = Depends(get_db)):
+    p = db.query(Product).filter(Product.id == product_id).first()
+    if not p:
+        raise HTTPException(status_code=404, detail="Product not found.")
+    p.status = "REJECTED"
+    p.is_available = False
+    db.commit()
+    return {"message": "Product rejected.", "status": "REJECTED"}
+
+
+# ==================== 23. PRODUCT IMAGES (multi) ====================
+
+@router.get("/products/{product_id}/images")
+def admin_get_product_images(product_id: int, db: Session = Depends(get_db)):
+    from app.models.marketplace import ProductImage
+    imgs = db.query(ProductImage).filter(ProductImage.product_id == product_id)\
+             .order_by(ProductImage.display_order).all()
+    return [{"id": i.id, "image_url": i.image_url, "is_primary": i.is_primary, "display_order": i.display_order} for i in imgs]
+
+
+@router.post("/products/{product_id}/images")
+def admin_add_product_image(product_id: int, image_url: str, is_primary: bool = False, db: Session = Depends(get_db)):
+    from app.models.marketplace import ProductImage
+    p = db.query(Product).filter(Product.id == product_id).first()
+    if not p:
+        raise HTTPException(status_code=404, detail="Product not found.")
+    if is_primary:
+        db.query(ProductImage).filter(ProductImage.product_id == product_id).update({"is_primary": False})
+        p.image_url = image_url
+    img = ProductImage(product_id=product_id, image_url=image_url, is_primary=is_primary)
+    db.add(img)
+    db.commit()
+    return {"message": "Image added.", "id": img.id, "image_url": image_url}
+
+
+@router.delete("/product-images/{image_id}")
+def admin_delete_product_image(image_id: int, db: Session = Depends(get_db)):
+    from app.models.marketplace import ProductImage
+    img = db.query(ProductImage).filter(ProductImage.id == image_id).first()
+    if not img:
+        raise HTTPException(status_code=404, detail="Image not found.")
+    db.delete(img)
+    db.commit()
+    return {"message": "Image deleted."}
