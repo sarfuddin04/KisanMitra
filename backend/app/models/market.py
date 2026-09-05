@@ -56,6 +56,43 @@ class Mandi(Base):
 
     district = relationship("District", back_populates="mandis")
     prices = relationship("MarketPrice", back_populates="mandi", foreign_keys="MarketPrice.mandi_id")
+    mandi_crops = relationship("MandiCrop", back_populates="mandi", cascade="all, delete-orphan")
+    images = relationship("MandiImage", back_populates="mandi", cascade="all, delete-orphan")
+
+
+# ==================== MANDI-CROP ASSOCIATION (M2M) ====================
+
+class MandiCrop(Base):
+    """Many-to-many association between mandis and crops — proper relational design."""
+    __tablename__ = "mandi_crops"
+
+    id = Column(Integer, primary_key=True, index=True)
+    mandi_id = Column(Integer, ForeignKey("mandis.id", ondelete="CASCADE"), nullable=False, index=True)
+    crop_id = Column(Integer, ForeignKey("crops.id", ondelete="CASCADE"), nullable=False, index=True)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+
+    mandi = relationship("Mandi", back_populates="mandi_crops")
+    crop = relationship("Crop")
+
+    __table_args__ = (
+        UniqueConstraint("mandi_id", "crop_id", name="uq_mandi_crop"),
+    )
+
+
+# ==================== MANDI IMAGES ====================
+
+class MandiImage(Base):
+    """Multiple images per mandi."""
+    __tablename__ = "mandi_images"
+
+    id = Column(Integer, primary_key=True, index=True)
+    mandi_id = Column(Integer, ForeignKey("mandis.id", ondelete="CASCADE"), nullable=False, index=True)
+    image_url = Column(String(255), nullable=False)
+    is_primary = Column(Boolean, default=False)
+    display_order = Column(Integer, default=0)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+
+    mandi = relationship("Mandi", back_populates="images")
 
 
 # ==================== LEGACY MARKET (backward compat) ====================

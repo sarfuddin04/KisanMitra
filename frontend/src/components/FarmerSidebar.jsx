@@ -15,7 +15,8 @@ import {
   Bell,
   UserCheck,
   ChevronRight,
-  X
+  X,
+  Map
 } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 
@@ -29,6 +30,7 @@ export const FarmerSidebar = ({ isOpen = false, onClose = () => {} }) => {
     { to: "/fertilizer-recommendation", label: "Fertilizer Calculator", icon: FlaskConical },
     { to: "/weather", label: "Weather Forecast", icon: CloudSun },
     { to: "/market-prices", label: "Mandi Market Prices", icon: TrendingUp },
+    { to: "/mandi-map", label: "Mandi Map", icon: Map },
     { to: "/ai-assistant", label: "AI Farming Assistant", icon: Bot },
     { to: "/farming-tips", label: "Farming Practices", icon: Lightbulb },
     { to: "/marketplace", label: "Agri Marketplace", icon: ShoppingBag },

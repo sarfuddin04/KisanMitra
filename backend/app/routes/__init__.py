@@ -15,11 +15,13 @@ from app.routes.notifications import router as notif_router
 from app.routes.public import router as public_router
 from app.routes.admin import router as admin_router
 from app.routes.crops import router as crops_router
+from app.routes.locations import router as locations_router
 
 api_router = APIRouter()
 
 api_router.include_router(auth_router)
 api_router.include_router(crops_router)
+api_router.include_router(locations_router)
 api_router.include_router(rec_router)
 api_router.include_router(disease_router)
 api_router.include_router(fertilizer_router)

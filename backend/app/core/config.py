@@ -25,8 +25,15 @@ class Settings(BaseSettings):
     )
     
     # External APIs
-    OPENWEATHER_API_KEY: str = os.getenv("OPENWEATHER_API_KEY", "")
     GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY", "")
+    
+    # Weather API (WeatherAPI.com) — key stays backend-only
+    WEATHER_API_KEY: str = os.getenv("WEATHER_API_KEY", "")
+    WEATHER_API_BASE_URL: str = os.getenv("WEATHER_API_BASE_URL", "https://api.weatherapi.com/v1")
+    WEATHER_CACHE_MINUTES: int = int(os.getenv("WEATHER_CACHE_MINUTES", "10"))
+    
+    # Google Maps (server-side geocoding, optional)
+    GOOGLE_MAPS_SERVER_KEY: str = os.getenv("GOOGLE_MAPS_SERVER_KEY", "")
     
     # Official Market Data API (data.gov.in / AGMARKNET)
     MARKET_DATA_API_KEY: str = os.getenv("MARKET_DATA_API_KEY", "")

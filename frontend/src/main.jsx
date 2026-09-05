@@ -6,6 +6,7 @@ import App from './App.jsx';
 import { LanguageProvider } from './context/LanguageContext';
 import { AuthProvider } from './context/AuthContext';
 import { CartProvider } from './context/CartContext';
+import { LocationProvider } from './context/LocationContext';
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
@@ -13,7 +14,9 @@ createRoot(document.getElementById('root')).render(
       <LanguageProvider>
         <AuthProvider>
           <CartProvider>
-            <App />
+            <LocationProvider>
+              <App />
+            </LocationProvider>
           </CartProvider>
         </AuthProvider>
       </LanguageProvider>

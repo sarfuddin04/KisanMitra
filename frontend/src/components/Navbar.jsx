@@ -19,6 +19,7 @@ export const Navbar = () => {
     { name: t('nav_features'), path: '/features' },
     { name: t('nav_services'), path: '/services' },
     { name: t('nav_marketplace'), path: '/marketplace' },
+    { name: 'Mandi Map', path: '/mandi-map' },
     { name: t('nav_about'), path: '/about' },
     { name: t('nav_contact'), path: '/contact' }
   ];

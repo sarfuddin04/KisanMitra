@@ -10,7 +10,7 @@ from app.models.agronomy import (
     FertilizerRecommendation
 )
 from app.models.market import (
-    State, District, Mandi, Market,
+    State, District, Mandi, MandiCrop, MandiImage, Market,
     MarketPrice, MarketPriceHistory, PriceSyncLog,
     WeatherRecord
 )
@@ -40,7 +40,7 @@ __all__ = [
     "Role", "User", "UserProfile", "UserCrop",
     "Crop", "Fertilizer", "FertilizerPrice", "Disease",
     "CropRecommendation", "DiseasePrediction", "FertilizerRecommendation",
-    "State", "District", "Mandi", "Market",
+    "State", "District", "Mandi", "MandiCrop", "MandiImage", "Market",
     "MarketPrice", "MarketPriceHistory", "PriceSyncLog",
     "WeatherRecord",
     "ProductCategory", "Product", "ProductImage",

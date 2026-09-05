@@ -1166,3 +1166,260 @@ def admin_delete_product_image(image_id: int, db: Session = Depends(get_db)):
     db.delete(img)
     db.commit()
     return {"message": "Image deleted."}
+
+
+# ==================== 24. ADMIN LOCATION MANAGEMENT ====================
+# State → District → Mandi hierarchy CRUD
+
+# ---- STATES ----
+@router.get("/states")
+def admin_get_states(db: Session = Depends(get_db)):
+    states = db.query(State).order_by(State.name.asc()).all()
+    return [
+        {"id": s.id, "name": s.name, "is_active": s.is_active,
+         "created_at": s.created_at, "updated_at": s.updated_at}
+        for s in states
+    ]
+
+@router.post("/states")
+def admin_create_state(req: StateCreate, db: Session = Depends(get_db)):
+    existing = db.query(State).filter(State.name.ilike(req.name.strip())).first()
+    if existing:
+        raise HTTPException(status_code=400, detail=f"State '{req.name}' already exists.")
+    s = State(name=req.name.strip(), is_active=req.is_active if req.is_active is not None else True)
+    db.add(s)
+    db.commit()
+    db.refresh(s)
+    return {"id": s.id, "name": s.name, "is_active": s.is_active,
+            "created_at": s.created_at, "updated_at": s.updated_at}
+
+@router.put("/states/{state_id}")
+def admin_update_state(state_id: int, req: StateUpdate, db: Session = Depends(get_db)):
+    s = db.query(State).filter(State.id == state_id).first()
+    if not s:
+        raise HTTPException(status_code=404, detail="State not found.")
+    for k, v in req.dict(exclude_unset=True).items():
+        setattr(s, k, v)
+    db.commit()
+    db.refresh(s)
+    return {"id": s.id, "name": s.name, "is_active": s.is_active,
+            "created_at": s.created_at, "updated_at": s.updated_at}
+
+@router.delete("/states/{state_id}")
+def admin_delete_state(state_id: int, db: Session = Depends(get_db)):
+    s = db.query(State).filter(State.id == state_id).first()
+    if not s:
+        raise HTTPException(status_code=404, detail="State not found.")
+    # Cascade: delete districts and mandis
+    districts = db.query(District).filter(District.state_id == state_id).all()
+    for d in districts:
+        db.query(Mandi).filter(Mandi.district_id == d.id).delete()
+    db.query(District).filter(District.state_id == state_id).delete()
+    db.delete(s)
+    db.commit()
+    return {"message": f"State '{s.name}' and its districts/mandis deleted."}
+
+
+# ---- DISTRICTS ----
+@router.get("/states/{state_id}/districts")
+def admin_get_districts(state_id: int, db: Session = Depends(get_db)):
+    districts = db.query(District).filter(District.state_id == state_id)\
+                  .order_by(District.name.asc()).all()
+    return [
+        {"id": d.id, "state_id": d.state_id, "name": d.name,
+         "is_active": d.is_active, "created_at": d.created_at, "updated_at": d.updated_at}
+        for d in districts
+    ]
+
+@router.post("/districts")
+def admin_create_district(req: DistrictCreate, db: Session = Depends(get_db)):
+    state = db.query(State).filter(State.id == req.state_id).first()
+    if not state:
+        raise HTTPException(status_code=404, detail="Parent state not found.")
+    existing = db.query(District).filter(
+        District.state_id == req.state_id, District.name.ilike(req.name.strip())
+    ).first()
+    if existing:
+        raise HTTPException(status_code=400, detail=f"District '{req.name}' already exists in this state.")
+    d = District(state_id=req.state_id, name=req.name.strip(),
+                 is_active=req.is_active if req.is_active is not None else True)
+    db.add(d)
+    db.commit()
+    db.refresh(d)
+    return {"id": d.id, "state_id": d.state_id, "name": d.name,
+            "is_active": d.is_active, "created_at": d.created_at, "updated_at": d.updated_at}
+
+@router.put("/districts/{district_id}")
+def admin_update_district(district_id: int, req: DistrictUpdate, db: Session = Depends(get_db)):
+    d = db.query(District).filter(District.id == district_id).first()
+    if not d:
+        raise HTTPException(status_code=404, detail="District not found.")
+    for k, v in req.dict(exclude_unset=True).items():
+        setattr(d, k, v)
+    db.commit()
+    db.refresh(d)
+    return {"id": d.id, "state_id": d.state_id, "name": d.name,
+            "is_active": d.is_active, "created_at": d.created_at, "updated_at": d.updated_at}
+
+@router.delete("/districts/{district_id}")
+def admin_delete_district(district_id: int, db: Session = Depends(get_db)):
+    d = db.query(District).filter(District.id == district_id).first()
+    if not d:
+        raise HTTPException(status_code=404, detail="District not found.")
+    db.query(Mandi).filter(Mandi.district_id == district_id).delete()
+    db.delete(d)
+    db.commit()
+    return {"message": f"District '{d.name}' and its mandis deleted."}
+
+
+# ---- MANDIS ----
+@router.get("/mandis")
+def admin_list_mandis(
+    state_id: int = Query(None),
+    district_id: int = Query(None),
+    db: Session = Depends(get_db),
+):
+    """List mandis with optional state/district filters."""
+    from app.models.market import MandiCrop
+    q = db.query(Mandi).options(
+        joinedload(Mandi.mandi_crops).joinedload(MandiCrop.crop),
+        joinedload(Mandi.district).joinedload(District.state),
+    )
+    if district_id:
+        q = q.filter(Mandi.district_id == district_id)
+    elif state_id:
+        q = q.join(District, Mandi.district_id == District.id).filter(District.state_id == state_id)
+    mandis = q.order_by(Mandi.name.asc()).limit(500).all()
+    results = []
+    for m in mandis:
+        out = _admin_mandi_out(m)
+        if m.district:
+            out["district_name"] = m.district.name
+            out["state_name"] = m.district.state.name if m.district.state else ""
+            out["state_id"] = m.district.state_id
+        results.append(out)
+    return results
+
+@router.get("/districts/{district_id}/mandis")
+def admin_get_mandis(district_id: int, db: Session = Depends(get_db)):
+    from app.models.market import MandiCrop
+    mandis = db.query(Mandi).options(
+        joinedload(Mandi.mandi_crops).joinedload(MandiCrop.crop)
+    ).filter(Mandi.district_id == district_id).order_by(Mandi.name.asc()).all()
+    return [_admin_mandi_out(m) for m in mandis]
+
+@router.post("/mandis")
+def admin_create_mandi(req: MandiCreate, db: Session = Depends(get_db)):
+    district = db.query(District).filter(District.id == req.district_id).first()
+    if not district:
+        raise HTTPException(status_code=404, detail="Parent district not found.")
+    # Validate coordinates
+    if req.latitude is not None and not (-90 <= req.latitude <= 90):
+        raise HTTPException(status_code=400, detail="Latitude must be between -90 and 90.")
+    if req.longitude is not None and not (-180 <= req.longitude <= 180):
+        raise HTTPException(status_code=400, detail="Longitude must be between -180 and 180.")
+    m = Mandi(**req.dict())
+    db.add(m)
+    db.commit()
+    db.refresh(m)
+    return _admin_mandi_out(m)
+
+@router.put("/mandis/{mandi_id}")
+def admin_update_mandi(mandi_id: int, req: MandiUpdate, db: Session = Depends(get_db)):
+    m = db.query(Mandi).filter(Mandi.id == mandi_id).first()
+    if not m:
+        raise HTTPException(status_code=404, detail="Mandi not found.")
+    data = req.dict(exclude_unset=True)
+    if 'latitude' in data and data['latitude'] is not None and not (-90 <= data['latitude'] <= 90):
+        raise HTTPException(status_code=400, detail="Latitude must be between -90 and 90.")
+    if 'longitude' in data and data['longitude'] is not None and not (-180 <= data['longitude'] <= 180):
+        raise HTTPException(status_code=400, detail="Longitude must be between -180 and 180.")
+    for k, v in data.items():
+        setattr(m, k, v)
+    db.commit()
+    db.refresh(m)
+    return _admin_mandi_out(m)
+
+@router.delete("/mandis/{mandi_id}")
+def admin_delete_mandi(mandi_id: int, db: Session = Depends(get_db)):
+    m = db.query(Mandi).filter(Mandi.id == mandi_id).first()
+    if not m:
+        raise HTTPException(status_code=404, detail="Mandi not found.")
+    db.delete(m)
+    db.commit()
+    return {"message": f"Mandi '{m.name}' deleted."}
+
+
+# ---- MANDI-CROP ASSOCIATIONS ----
+@router.get("/mandis/{mandi_id}/crops")
+def admin_get_mandi_crops(mandi_id: int, db: Session = Depends(get_db)):
+    from app.models.market import MandiCrop
+    mcs = db.query(MandiCrop).options(
+        joinedload(MandiCrop.crop)
+    ).filter(MandiCrop.mandi_id == mandi_id).all()
+    return [
+        {"id": mc.id, "mandi_id": mc.mandi_id, "crop_id": mc.crop_id,
+         "crop_name": mc.crop.name if mc.crop else None}
+        for mc in mcs
+    ]
+
+@router.post("/mandis/{mandi_id}/crops")
+def admin_add_mandi_crop(mandi_id: int, crop_id: int = Query(...), db: Session = Depends(get_db)):
+    from app.models.market import MandiCrop
+    m = db.query(Mandi).filter(Mandi.id == mandi_id).first()
+    if not m:
+        raise HTTPException(status_code=404, detail="Mandi not found.")
+    crop = db.query(Crop).filter(Crop.id == crop_id).first()
+    if not crop:
+        raise HTTPException(status_code=404, detail="Crop not found.")
+    existing = db.query(MandiCrop).filter(
+        MandiCrop.mandi_id == mandi_id, MandiCrop.crop_id == crop_id
+    ).first()
+    if existing:
+        return {"message": "Crop already associated with this mandi.", "id": existing.id}
+    mc = MandiCrop(mandi_id=mandi_id, crop_id=crop_id)
+    db.add(mc)
+    db.commit()
+    db.refresh(mc)
+    return {"message": f"Crop '{crop.name}' added to mandi.", "id": mc.id}
+
+@router.delete("/mandis/{mandi_id}/crops/{crop_id}")
+def admin_remove_mandi_crop(mandi_id: int, crop_id: int, db: Session = Depends(get_db)):
+    from app.models.market import MandiCrop
+    mc = db.query(MandiCrop).filter(
+        MandiCrop.mandi_id == mandi_id, MandiCrop.crop_id == crop_id
+    ).first()
+    if not mc:
+        raise HTTPException(status_code=404, detail="Crop association not found.")
+    db.delete(mc)
+    db.commit()
+    return {"message": "Crop removed from mandi."}
+
+
+def _admin_mandi_out(m: Mandi) -> dict:
+    """Build admin-friendly mandi dict with crops."""
+    crops = []
+    if hasattr(m, 'mandi_crops') and m.mandi_crops:
+        crops = [
+            {"id": mc.crop.id, "name": mc.crop.name}
+            for mc in m.mandi_crops if mc.crop
+        ]
+    return {
+        "id": m.id,
+        "district_id": m.district_id,
+        "name": m.name,
+        "address": m.address,
+        "pincode": m.pincode,
+        "latitude": m.latitude,
+        "longitude": m.longitude,
+        "contact_number": m.contact_number,
+        "opening_time": m.opening_time,
+        "closing_time": m.closing_time,
+        "mandi_type": m.mandi_type,
+        "image_url": m.image_url,
+        "is_active": m.is_active,
+        "crops": crops,
+        "created_at": m.created_at,
+        "updated_at": m.updated_at,
+    }
+

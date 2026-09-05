@@ -16,6 +16,7 @@ import { Services } from './pages/public/Services';
 import { Contact } from './pages/public/Contact';
 import { Login } from './pages/public/Login';
 import { Register } from './pages/public/Register';
+import { MandiMapPage } from './pages/public/MandiMapPage';
 
 // Farmer Pages
 import { Dashboard } from './pages/farmer/Dashboard';
@@ -121,6 +122,7 @@ export function App() {
           <Route path="/marketplace" element={<MarketplacePage />} />
           <Route path="/market-prices" element={<MarketPricesPage />} />
           <Route path="/mandis/:id" element={<MandiDetailPage />} />
+          <Route path="/mandi-map" element={<MandiMapPage />} />
         </Route>
 
         {/* Admin Login */}

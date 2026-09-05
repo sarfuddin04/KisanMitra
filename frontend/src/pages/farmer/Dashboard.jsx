@@ -17,7 +17,8 @@ import {
   Droplets,
   Wind,
   Calendar,
-  AlertCircle
+  AlertCircle,
+  Map
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useLanguage } from '../../context/LanguageContext';
@@ -67,6 +68,7 @@ export const Dashboard = () => {
     { to: "/fertilizer-recommendation", label: "Fertilizer Advisory", icon: FlaskConical, color: "from-amber-500 to-amber-700", desc: "Nutrient gap analysis & dosing" },
     { to: "/weather", label: "Weather Radar", icon: CloudSun, color: "from-sky-500 to-sky-700", desc: "7-day rain probability & forecast" },
     { to: "/market-prices", label: "Mandi Rates", icon: TrendingUp, color: "from-emerald-600 to-teal-800", desc: "Live prices across APMCs" },
+    { to: "/mandi-map", label: "Mandi Map", icon: Map, color: "from-blue-500 to-indigo-700", desc: "All India mandi locations & nearby" },
     { to: "/ai-assistant", label: "AI Agronomist", icon: Bot, color: "from-purple-500 to-purple-700", desc: "24/7 farming question support" },
     { to: "/marketplace", label: "Agri Market", icon: ShoppingBag, color: "from-rose-500 to-rose-700", desc: "Buy seeds & sell farm produce" },
     { to: "/crop-history", label: "PDF Reports", icon: FileText, color: "from-slate-600 to-slate-800", desc: "View & download test certificates" }
@@ -139,8 +141,12 @@ export const Dashboard = () => {
               <p className="text-4xl font-black text-gray-900">{weather?.temperature || 28}°C</p>
               <p className="text-xs font-semibold text-emerald-700 mt-0.5">{weather?.condition || 'Mainly Clear'}</p>
             </div>
-            <div className="w-16 h-16 rounded-2xl bg-sky-50 text-sky-600 flex items-center justify-center">
-              <CloudSun className="w-10 h-10" />
+            <div className="w-16 h-16 rounded-2xl bg-sky-50 text-sky-600 flex items-center justify-center overflow-hidden">
+              {weather?.icon_url ? (
+                <img src={weather.icon_url} alt={weather.condition || ''} className="w-12 h-12" />
+              ) : (
+                <CloudSun className="w-10 h-10" />
+              )}
             </div>
           </div>
 
