@@ -200,7 +200,7 @@ export const MarketplacePage = () => {
           {products.map((p) => (
             <div key={p.id} className="bg-white rounded-2xl border border-gray-100 shadow-xs hover:shadow-md transition-all overflow-hidden group">
               {/* Image */}
-              <div className="h-44 overflow-hidden relative">
+              <div className="h-44 overflow-hidden relative cursor-pointer" onClick={() => navigate(`/marketplace/products/${p.id}`)}>
                 <img
                   src={getImageUrl(p)}
                   alt={p.name}
@@ -221,7 +221,7 @@ export const MarketplacePage = () => {
 
               {/* Content */}
               <div className="p-4 space-y-2.5">
-                <h3 className="font-extrabold text-gray-900 text-sm">{p.name}</h3>
+                <h3 className="font-extrabold text-gray-900 text-sm cursor-pointer hover:text-emerald-700 transition-colors" onClick={() => navigate(`/marketplace/products/${p.id}`)}>{p.name}</h3>
 
                 {/* Price */}
                 <div className="flex items-baseline space-x-1.5">
@@ -255,11 +255,18 @@ export const MarketplacePage = () => {
                 {/* Actions */}
                 <div className="flex gap-2 pt-1">
                   <button
+                    onClick={() => navigate(`/marketplace/products/${p.id}`)}
+                    className="flex-1 py-2 bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold text-[11px] rounded-lg transition-all flex items-center justify-center space-x-1 border border-blue-200"
+                  >
+                    <Eye className="w-3 h-3" />
+                    <span>Details</span>
+                  </button>
+                  <button
                     onClick={() => handleAddToCart(p)}
                     className="flex-1 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[11px] rounded-lg transition-all flex items-center justify-center space-x-1"
                   >
                     <ShoppingCart className="w-3 h-3" />
-                    <span>Add to Cart</span>
+                    <span>Cart</span>
                   </button>
                   <button
                     onClick={() => handleBuyNow(p)}

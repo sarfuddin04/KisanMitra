@@ -286,34 +286,201 @@ def seed_database(db: Session = None):
             db.commit()
 
         # 7. Product Categories & Marketplace
-        if db.query(ProductCategory).count() == 0:
-            categories_data = [
-                {"name": "Grains & Cereals", "slug": "grains-cereals", "description": "Direct farm harvested wheat, paddy, maize and millets", "icon_name": "Wheat"},
-                {"name": "Organic Pulses & Legumes", "slug": "pulses", "description": "Unpolished lentils, chickpeas, and rajma", "icon_name": "Bean"},
-                {"name": "Fresh Vegetables & Fruits", "slug": "produce", "description": "Farm-fresh daily harvest produce", "icon_name": "Carrot"},
-                {"name": "Certified Seeds", "slug": "seeds", "description": "High germination hybrid & organic heirloom seeds", "icon_name": "Sprout"},
-                {"name": "Bio-Fertilizers & Nutrients", "slug": "fertilizers", "description": "Organic compost, vermicompost, and liquid micronutrients", "icon_name": "FlaskConical"},
-                {"name": "Farming Equipment & Tools", "slug": "tools", "description": "Drip kits, sprayers, and precision farm tools", "icon_name": "Wrench"}
-            ]
-            cat_objs = []
-            for c in categories_data:
-                cat_obj = ProductCategory(**c)
-                db.add(cat_obj)
-                cat_objs.append(cat_obj)
-            db.commit()
+        # Expand to 10 categories, seed 45+ products with images
+        categories_data = [
+            {"name": "Seeds", "slug": "seeds", "description": "High germination hybrid & organic heirloom seeds", "icon_name": "Sprout"},
+            {"name": "Fertilizers", "slug": "fertilizers", "description": "Organic compost, chemical fertilizers & micronutrients", "icon_name": "FlaskConical"},
+            {"name": "Pesticides", "slug": "pesticides", "description": "Bio and chemical crop protection sprays", "icon_name": "Bug"},
+            {"name": "Farming Tools", "slug": "farming-tools", "description": "Hand tools, sprayers & precision farm instruments", "icon_name": "Wrench"},
+            {"name": "Irrigation Equipment", "slug": "irrigation", "description": "Drip kits, sprinklers, pumps & pipes", "icon_name": "Droplets"},
+            {"name": "Organic Products", "slug": "organic", "description": "100% organic farm produce & inputs", "icon_name": "Leaf"},
+            {"name": "Farm Machinery", "slug": "machinery", "description": "Power tillers, weeders & small farm equipment", "icon_name": "Cog"},
+            {"name": "Crop Protection", "slug": "crop-protection", "description": "Fungicides, insecticides & bio-agents", "icon_name": "ShieldCheck"},
+            {"name": "Animal & Farm Supplies", "slug": "farm-supplies", "description": "Feed, supplements & livestock essentials", "icon_name": "Beef"},
+            {"name": "Agricultural Accessories", "slug": "accessories", "description": "Nets, mulch sheets, grow bags & tools", "icon_name": "Package"},
+        ]
 
-            seller = farmer_user or admin_user
-            products_data = [
-                {"seller_id": seller.id, "category_id": cat_objs[0].id, "name": "Sharbati Golden Wheat (100% Organic)", "description": "A-Grade MP Sharbati wheat grown naturally without synthetic pesticides. Naturally sweet taste and high gluten quality.", "price": 42.0, "unit": "kg", "stock_quantity": 5000.0, "location": "Lucknow, Uttar Pradesh", "is_organic": True, "rating": 4.9},
-                {"seller_id": seller.id, "category_id": cat_objs[0].id, "name": "Traditional Basmati Rice (Pusa 1121)", "description": "Extra-long grain aged Basmati rice with authentic rich aroma. Direct from farmer harvest.", "price": 95.0, "unit": "kg", "stock_quantity": 3000.0, "location": "Karnal, Haryana", "is_organic": False, "rating": 4.8},
-                {"seller_id": seller.id, "category_id": cat_objs[1].id, "name": "Desi Chana (Organic Brown Chickpeas)", "description": "Protein-rich unpolished indigenous desi chickpeas. Cleaned and sun-dried.", "price": 88.0, "unit": "kg", "stock_quantity": 1200.0, "location": "Nagpur, Maharashtra", "is_organic": True, "rating": 4.9},
-                {"seller_id": seller.id, "category_id": cat_objs[3].id, "name": "Hybrid Mustard Seeds (Pusa Bold)", "description": "Certified high oil-content mustard seed pack with 95%+ germination rate. Resistant to white rust.", "price": 450.0, "unit": "packet (1 kg)", "stock_quantity": 250.0, "location": "Jaipur, Rajasthan", "is_organic": False, "rating": 4.7},
-                {"seller_id": seller.id, "category_id": cat_objs[4].id, "name": "Enriched Cow Dung Vermicompost", "description": "100% pure organic vermicompost enriched with neem cake and beneficial soil microbes.", "price": 12.0, "unit": "kg", "stock_quantity": 10000.0, "location": "Pune, Maharashtra", "is_organic": True, "rating": 5.0},
-                {"seller_id": seller.id, "category_id": cat_objs[5].id, "name": "16-Liter Battery Operated Knapsack Sprayer", "description": "Dual motor rechargeable farm sprayer with adjustable brass nozzles for uniform foliar spray.", "price": 2850.0, "unit": "piece", "stock_quantity": 40.0, "location": "New Delhi", "is_organic": False, "rating": 4.8}
-            ]
-            for p in products_data:
-                db.add(Product(**p))
-            db.commit()
+        # Upsert categories
+        cat_map = {}  # slug -> ProductCategory obj
+        for c_data in categories_data:
+            existing_cat = db.query(ProductCategory).filter(ProductCategory.slug == c_data["slug"]).first()
+            if existing_cat:
+                for k, v in c_data.items():
+                    setattr(existing_cat, k, v)
+                cat_map[c_data["slug"]] = existing_cat
+            else:
+                cat_obj = ProductCategory(**c_data)
+                db.add(cat_obj)
+                db.flush()
+                cat_map[c_data["slug"]] = cat_obj
+        db.commit()
+
+        # Re-fetch to ensure IDs
+        for slug in cat_map:
+            cat_map[slug] = db.query(ProductCategory).filter(ProductCategory.slug == slug).first()
+
+        seller = farmer_user or admin_user
+
+        # Full product catalog — 45 products across 10 categories
+        # Each product has a unique relevant Unsplash image
+        all_products = [
+            # ── SEEDS (7) ──
+            {"name": "Premium Wheat Seeds (Sharbati)", "category": "seeds", "description": "High-yield MP Sharbati wheat seeds with 95%+ germination rate. Certified disease-resistant variety ideal for Rabi season.", "price": 850, "unit": "10 kg bag", "stock_quantity": 500, "location": "Indore, Madhya Pradesh", "is_organic": False, "rating": 4.9,
+             "image_url": "https://images.unsplash.com/photo-1574323347407-f5e1ad6d020b?w=600&q=80"},
+            {"name": "Basmati Rice Seeds (Pusa 1121)", "category": "seeds", "description": "Extra-long grain aromatic Basmati paddy seeds. Perfect for irrigated fields in Punjab-Haryana belt.", "price": 1200, "unit": "5 kg bag", "stock_quantity": 300, "location": "Karnal, Haryana", "is_organic": False, "rating": 4.8,
+             "image_url": "https://images.unsplash.com/photo-1586201375761-83865001e31c?w=600&q=80"},
+            {"name": "Hybrid Maize Seeds (Pioneer)", "category": "seeds", "description": "Single cross hybrid maize seeds with excellent cob fill and drought tolerance. Suitable for Kharif season.", "price": 650, "unit": "4 kg bag", "stock_quantity": 400, "location": "Nashik, Maharashtra", "is_organic": False, "rating": 4.7,
+             "image_url": "https://images.unsplash.com/photo-1551754655-cd27e38d2076?w=600&q=80"},
+            {"name": "Mustard Seeds (Pusa Bold)", "category": "seeds", "description": "High oil-content certified mustard seeds resistant to white rust. 95%+ germination guarantee.", "price": 450, "unit": "1 kg packet", "stock_quantity": 250, "location": "Jaipur, Rajasthan", "is_organic": False, "rating": 4.7,
+             "image_url": "https://images.unsplash.com/photo-1508747703725-719777637510?w=600&q=80"},
+            {"name": "Tomato Seeds (Hybrid Himsona)", "category": "seeds", "description": "High-yielding hybrid tomato seeds with firm fruits and excellent shelf life. Suitable for all-season cultivation.", "price": 320, "unit": "10g packet", "stock_quantity": 600, "location": "Pune, Maharashtra", "is_organic": False, "rating": 4.8,
+             "image_url": "https://images.unsplash.com/photo-1592924357228-91a4daadcfea?w=600&q=80"},
+            {"name": "Paddy Seeds (PR 126 Non-Basmati)", "category": "seeds", "description": "Short duration non-basmati paddy variety maturing in 123 days. Good for late transplanting.", "price": 380, "unit": "5 kg bag", "stock_quantity": 350, "location": "Ludhiana, Punjab", "is_organic": False, "rating": 4.6,
+             "image_url": "https://images.unsplash.com/photo-1536304993881-460e32342370?w=600&q=80"},
+            {"name": "Vegetable Seed Kit (10-in-1)", "category": "seeds", "description": "Complete kitchen garden seed kit: tomato, brinjal, chili, okra, spinach, coriander, radish, carrot, pumpkin, bottle gourd.", "price": 499, "unit": "kit", "stock_quantity": 200, "location": "New Delhi", "is_organic": True, "rating": 4.9,
+             "image_url": "https://images.unsplash.com/photo-1416879595882-3373a0480b5b?w=600&q=80"},
+
+            # ── FERTILIZERS (6) ──
+            {"name": "Urea Fertilizer (Neem Coated 46-0-0)", "category": "fertilizers", "description": "Government-approved neem coated urea with 46% nitrogen. Slow release reduces leaching losses by 15%.", "price": 266, "unit": "45 kg bag", "stock_quantity": 800, "location": "Kanpur, Uttar Pradesh", "is_organic": False, "rating": 4.7,
+             "image_url": "https://images.unsplash.com/photo-1585314062340-f1a5a7c9328d?w=600&q=80"},
+            {"name": "DAP Fertilizer (18-46-0)", "category": "fertilizers", "description": "Di-ammonium phosphate for strong root development. Best applied as basal dose during sowing.", "price": 1350, "unit": "50 kg bag", "stock_quantity": 600, "location": "Lucknow, Uttar Pradesh", "is_organic": False, "rating": 4.8,
+             "image_url": "https://images.unsplash.com/photo-1625246333195-78d9c38ad449?w=600&q=80"},
+            {"name": "NPK 10-26-26 Complex", "category": "fertilizers", "description": "Balanced complex fertilizer for flowering and fruiting stage of crops. Excellent for potato, onion and vegetable crops.", "price": 1450, "unit": "50 kg bag", "stock_quantity": 400, "location": "Nashik, Maharashtra", "is_organic": False, "rating": 4.7,
+             "image_url": "https://images.unsplash.com/photo-1464226184884-fa280b87c399?w=600&q=80"},
+            {"name": "Enriched Vermicompost (Organic)", "category": "fertilizers", "description": "100% pure organic vermicompost enriched with neem cake and beneficial soil microbes. NPOP certified.", "price": 12, "unit": "kg", "stock_quantity": 10000, "location": "Pune, Maharashtra", "is_organic": True, "rating": 5.0,
+             "image_url": "https://images.unsplash.com/photo-1588964895597-cfccd6e2dbf9?w=600&q=80"},
+            {"name": "NPK 12-32-16 Fertilizer", "category": "fertilizers", "description": "Phosphorus-rich complex fertilizer ideal for root crops and legumes. Apply as basal at sowing time.", "price": 1380, "unit": "50 kg bag", "stock_quantity": 350, "location": "Bhopal, Madhya Pradesh", "is_organic": False, "rating": 4.6,
+             "image_url": "https://images.unsplash.com/photo-1574943320219-553eb213f72d?w=600&q=80"},
+            {"name": "Neem Cake Organic Fertilizer", "category": "fertilizers", "description": "Cold-pressed neem cake powder rich in Azadirachtin. Acts as soil conditioner and natural pest deterrent.", "price": 28, "unit": "kg", "stock_quantity": 5000, "location": "Indore, Madhya Pradesh", "is_organic": True, "rating": 4.8,
+             "image_url": "https://images.unsplash.com/photo-1523348837708-15d4a09cfac2?w=600&q=80"},
+
+            # ── PESTICIDES (4) ──
+            {"name": "Neem-Based Bio Pesticide (Azadirachtin 1500 ppm)", "category": "pesticides", "description": "Botanical insecticide from neem seed extract. Controls 200+ pests including whitefly, aphids, and thrips. Safe for beneficial insects.", "price": 580, "unit": "1 litre", "stock_quantity": 300, "location": "Pune, Maharashtra", "is_organic": True, "rating": 4.8,
+             "image_url": "https://images.unsplash.com/photo-1530836369250-ef72a3f5cda8?w=600&q=80"},
+            {"name": "Imidacloprid 17.8% SL Insecticide", "category": "pesticides", "description": "Systemic insecticide for sucking pest control in cotton, paddy and vegetables. Long residual activity.", "price": 420, "unit": "250 ml", "stock_quantity": 500, "location": "Karnal, Haryana", "is_organic": False, "rating": 4.5,
+             "image_url": "https://images.unsplash.com/photo-1563910791-1484b3567cef?w=600&q=80"},
+            {"name": "Mancozeb 75% WP Fungicide", "category": "pesticides", "description": "Broad-spectrum contact fungicide for early blight, late blight, downy mildew and leaf spot diseases.", "price": 350, "unit": "500g packet", "stock_quantity": 450, "location": "Jaipur, Rajasthan", "is_organic": False, "rating": 4.6,
+             "image_url": "https://images.unsplash.com/photo-1598512752271-33f913a5af13?w=600&q=80"},
+            {"name": "Organic Crop Protection Kit", "category": "pesticides", "description": "Complete organic pest management kit: Neem oil, Trichoderma, Pseudomonas, and yellow sticky traps.", "price": 1250, "unit": "kit", "stock_quantity": 150, "location": "New Delhi", "is_organic": True, "rating": 4.9,
+             "image_url": "https://images.unsplash.com/photo-1592150621744-aca64f48394a?w=600&q=80"},
+
+            # ── FARMING TOOLS (5) ──
+            {"name": "16L Battery Operated Knapsack Sprayer", "category": "farming-tools", "description": "Dual motor rechargeable farm sprayer with adjustable brass nozzles. 6-8 hours battery life per charge.", "price": 2850, "unit": "piece", "stock_quantity": 40, "location": "New Delhi", "is_organic": False, "rating": 4.8,
+             "image_url": "https://images.unsplash.com/photo-1597916829826-02e5bb4a54e0?w=600&q=80"},
+            {"name": "Manual Seed Drill (5-Row)", "category": "farming-tools", "description": "Lightweight 5-row manual seed drill for precise seed placement. Adjustable seed rate for wheat, mustard, gram.", "price": 4500, "unit": "piece", "stock_quantity": 25, "location": "Ludhiana, Punjab", "is_organic": False, "rating": 4.7,
+             "image_url": "https://images.unsplash.com/photo-1500651230702-0e2d8a49d4ad?w=600&q=80"},
+            {"name": "Soil Testing Kit (Professional)", "category": "farming-tools", "description": "Complete soil NPK, pH, EC testing kit with reagents and digital meter. Includes 50 test strips.", "price": 1850, "unit": "kit", "stock_quantity": 60, "location": "Lucknow, Uttar Pradesh", "is_organic": False, "rating": 4.9,
+             "image_url": "https://images.unsplash.com/photo-1585336261022-680e295ce3fe?w=600&q=80"},
+            {"name": "Hand Weeder (3-Prong Steel)", "category": "farming-tools", "description": "Ergonomic hardened steel hand weeder for precision weed removal. Rubber grip handle for comfort.", "price": 280, "unit": "piece", "stock_quantity": 200, "location": "Nagpur, Maharashtra", "is_organic": False, "rating": 4.5,
+             "image_url": "https://images.unsplash.com/photo-1416453072034-c8dbfa2856b5?w=600&q=80"},
+            {"name": "Pruning Secateur (Bypass Type)", "category": "farming-tools", "description": "Japanese steel bypass pruner for clean cuts on live stems. Ideal for fruit orchards and vegetable gardens.", "price": 650, "unit": "piece", "stock_quantity": 100, "location": "Pune, Maharashtra", "is_organic": False, "rating": 4.7,
+             "image_url": "https://images.unsplash.com/photo-1590682680695-43b964a3ae17?w=600&q=80"},
+
+            # ── IRRIGATION EQUIPMENT (4) ──
+            {"name": "Drip Irrigation Kit (1/4 Acre)", "category": "irrigation", "description": "Complete drip irrigation system for 1/4 acre: mainline, sub-main, laterals, emitters, filter, connectors.", "price": 8500, "unit": "kit", "stock_quantity": 30, "location": "Jaipur, Rajasthan", "is_organic": False, "rating": 4.9,
+             "image_url": "https://images.unsplash.com/photo-1557234195-bd9f290f0e4d?w=600&q=80"},
+            {"name": "Sprinkler Irrigation Set (Rain Gun)", "category": "irrigation", "description": "360-degree rain gun sprinkler with 30m throw radius. Includes tripod stand, hose coupling.", "price": 3500, "unit": "set", "stock_quantity": 35, "location": "Karnal, Haryana", "is_organic": False, "rating": 4.7,
+             "image_url": "https://images.unsplash.com/photo-1509316975850-ff9c5deb0cd9?w=600&q=80"},
+            {"name": "Submersible Water Pump (1 HP)", "category": "irrigation", "description": "Single phase 1 HP submersible pump for borewell irrigation. Energy efficient motor with thermal overload protection.", "price": 6800, "unit": "piece", "stock_quantity": 20, "location": "Ludhiana, Punjab", "is_organic": False, "rating": 4.8,
+             "image_url": "https://images.unsplash.com/photo-1504297050568-910d24c426d3?w=600&q=80"},
+            {"name": "PVC Irrigation Pipe (6 inch, 20ft)", "category": "irrigation", "description": "Heavy-duty agricultural PVC pipe, ISI marked. UV-resistant for exposed installations.", "price": 550, "unit": "20 ft pipe", "stock_quantity": 500, "location": "Kanpur, Uttar Pradesh", "is_organic": False, "rating": 4.5,
+             "image_url": "https://images.unsplash.com/photo-1581092160607-ee67df4e6fbe?w=600&q=80"},
+
+            # ── ORGANIC PRODUCTS (4) ──
+            {"name": "Sharbati Golden Wheat (100% Organic)", "category": "organic", "description": "A-Grade MP Sharbati wheat grown naturally without synthetic pesticides. Naturally sweet taste and high gluten.", "price": 55, "unit": "kg", "stock_quantity": 5000, "location": "Indore, Madhya Pradesh", "is_organic": True, "rating": 4.9,
+             "image_url": "https://images.unsplash.com/photo-1568254183919-78a4f43a2877?w=600&q=80"},
+            {"name": "Desi Chana (Organic Brown Chickpeas)", "category": "organic", "description": "Protein-rich unpolished indigenous chickpeas. Sun-dried, chemical-free and hand-sorted.", "price": 88, "unit": "kg", "stock_quantity": 1200, "location": "Nagpur, Maharashtra", "is_organic": True, "rating": 4.9,
+             "image_url": "https://images.unsplash.com/photo-1515543904379-3d757afe72e6?w=600&q=80"},
+            {"name": "Cold-Pressed Mustard Oil (Wood Churned)", "category": "organic", "description": "Traditional wood-pressed kachi ghani mustard oil. No chemicals, no heat processing. Rich pungent aroma.", "price": 220, "unit": "litre", "stock_quantity": 500, "location": "Jaipur, Rajasthan", "is_organic": True, "rating": 5.0,
+             "image_url": "https://images.unsplash.com/photo-1474979266404-7eaacbcd87d5?w=600&q=80"},
+            {"name": "Organic Jaggery (Gur) Block", "category": "organic", "description": "Pure sugarcane jaggery made in traditional iron pan process. No sulphur or chemicals added.", "price": 65, "unit": "kg", "stock_quantity": 800, "location": "Kanpur, Uttar Pradesh", "is_organic": True, "rating": 4.8,
+             "image_url": "https://images.unsplash.com/photo-1604514628550-37477afdf4e3?w=600&q=80"},
+
+            # ── FARM MACHINERY (4) ──
+            {"name": "Power Weeder (Petrol 2HP)", "category": "machinery", "description": "Compact 2HP petrol power weeder with adjustable tilling width. Perfect for inter-row cultivation in small farms.", "price": 28000, "unit": "piece", "stock_quantity": 10, "location": "Ludhiana, Punjab", "is_organic": False, "rating": 4.8,
+             "image_url": "https://images.unsplash.com/photo-1592805144716-feeccccef5ac?w=600&q=80"},
+            {"name": "Mini Tiller / Cultivator (5HP Diesel)", "category": "machinery", "description": "Versatile 5HP diesel mini tiller for primary tillage, seed bed preparation. Attachments: plough, rotavator, ridger.", "price": 52000, "unit": "piece", "stock_quantity": 5, "location": "Bhopal, Madhya Pradesh", "is_organic": False, "rating": 4.7,
+             "image_url": "https://images.unsplash.com/photo-1589923188651-268a9765e432?w=600&q=80"},
+            {"name": "Agricultural Brush Cutter (4-Stroke)", "category": "machinery", "description": "Heavy-duty 4-stroke brush cutter for weed clearing, grass cutting, and farm maintenance. Low vibration handle.", "price": 12500, "unit": "piece", "stock_quantity": 15, "location": "Nashik, Maharashtra", "is_organic": False, "rating": 4.6,
+             "image_url": "https://images.unsplash.com/photo-1558618666-fcd25c85f82e?w=600&q=80"},
+            {"name": "Chaff Cutter (Electric 3HP)", "category": "machinery", "description": "High-capacity electric chaff cutter for fodder preparation. Cuts green and dry fodder into uniform lengths.", "price": 18500, "unit": "piece", "stock_quantity": 8, "location": "Karnal, Haryana", "is_organic": False, "rating": 4.7,
+             "image_url": "https://images.unsplash.com/photo-1500595046743-cd271d694d30?w=600&q=80"},
+
+            # ── CROP PROTECTION (4) ──
+            {"name": "Trichoderma Viride Bio-Agent", "category": "crop-protection", "description": "Biological control agent for soil-borne fungal diseases like root rot, wilt, and damping off. CFU >2x10⁸/g.", "price": 180, "unit": "1 kg packet", "stock_quantity": 300, "location": "Pune, Maharashtra", "is_organic": True, "rating": 4.8,
+             "image_url": "https://images.unsplash.com/photo-1471193945509-9ad0617afabf?w=600&q=80"},
+            {"name": "Yellow Sticky Traps (Pack of 50)", "category": "crop-protection", "description": "Double-sided adhesive traps for monitoring and mass trapping of whiteflies, aphids, and thrips.", "price": 320, "unit": "pack of 50", "stock_quantity": 400, "location": "New Delhi", "is_organic": True, "rating": 4.6,
+             "image_url": "https://images.unsplash.com/photo-1523348837708-15d4a09cfac2?w=600&q=80"},
+            {"name": "Pheromone Trap (Helicoverpa Kit)", "category": "crop-protection", "description": "Funnel-type pheromone trap with lures for cotton bollworm and tomato fruit borer monitoring. Pack of 5.", "price": 750, "unit": "kit of 5", "stock_quantity": 200, "location": "Nagpur, Maharashtra", "is_organic": True, "rating": 4.7,
+             "image_url": "https://images.unsplash.com/photo-1505142468610-359e7d316be0?w=600&q=80"},
+            {"name": "Copper Oxychloride 50% WP Fungicide", "category": "crop-protection", "description": "Contact fungicide for downy mildew, late blight and bacterial leaf spot. Safe for organic integration.", "price": 280, "unit": "500g packet", "stock_quantity": 350, "location": "Indore, Madhya Pradesh", "is_organic": False, "rating": 4.5,
+             "image_url": "https://images.unsplash.com/photo-1595351298020-038700609878?w=600&q=80"},
+
+            # ── ANIMAL & FARM SUPPLIES (4) ──
+            {"name": "Cattle Feed Concentrate (Premium)", "category": "farm-supplies", "description": "Balanced dairy cattle feed with 20% crude protein. Fortified with minerals, vitamins and bypass fat.", "price": 1200, "unit": "50 kg bag", "stock_quantity": 200, "location": "Karnal, Haryana", "is_organic": False, "rating": 4.7,
+             "image_url": "https://images.unsplash.com/photo-1560493676-04071c5f467b?w=600&q=80"},
+            {"name": "Mineral Mixture for Livestock", "category": "farm-supplies", "description": "Chelated mineral mixture with calcium, phosphorus, zinc, copper. Prevents deficiency diseases in cattle.", "price": 450, "unit": "5 kg pack", "stock_quantity": 300, "location": "Lucknow, Uttar Pradesh", "is_organic": False, "rating": 4.6,
+             "image_url": "https://images.unsplash.com/photo-1516467508483-a7212febe31a?w=600&q=80"},
+            {"name": "Poultry Layer Feed (Premium)", "category": "farm-supplies", "description": "Complete layer poultry feed with optimal amino acid profile for maximum egg production and shell quality.", "price": 1450, "unit": "50 kg bag", "stock_quantity": 150, "location": "Nashik, Maharashtra", "is_organic": False, "rating": 4.5,
+             "image_url": "https://images.unsplash.com/photo-1548550023-2bdb3c5beed7?w=600&q=80"},
+            {"name": "Silage Wrap Film (750mm)", "category": "farm-supplies", "description": "UV-stabilized silage stretch wrap film for bale wrapping. Ensures anaerobic fermentation for quality silage.", "price": 2200, "unit": "roll", "stock_quantity": 80, "location": "Ludhiana, Punjab", "is_organic": False, "rating": 4.6,
+             "image_url": "https://images.unsplash.com/photo-1625246333195-78d9c38ad449?w=600&q=80"},
+
+            # ── AGRICULTURAL ACCESSORIES (3) ──
+            {"name": "Shade Net (50% Green, 4x50m)", "category": "accessories", "description": "HDPE knitted shade net for nursery, polyhouse and outdoor crop protection. UV-stabilized for 5+ years.", "price": 2800, "unit": "roll", "stock_quantity": 50, "location": "Pune, Maharashtra", "is_organic": False, "rating": 4.7,
+             "image_url": "https://images.unsplash.com/photo-1530836369250-ef72a3f5cda8?w=600&q=80"},
+            {"name": "Mulch Film (Black, 1m x 400m)", "category": "accessories", "description": "25-micron black mulch film for weed suppression and soil moisture retention. Biodegradable option available.", "price": 1800, "unit": "roll", "stock_quantity": 60, "location": "Nashik, Maharashtra", "is_organic": False, "rating": 4.6,
+             "image_url": "https://images.unsplash.com/photo-1464226184884-fa280b87c399?w=600&q=80"},
+            {"name": "Grow Bags (15x15 inch, Pack of 10)", "category": "accessories", "description": "Heavy-duty UV-treated grow bags for terrace farming and nursery. Excellent drainage with reinforced handles.", "price": 650, "unit": "pack of 10", "stock_quantity": 200, "location": "New Delhi", "is_organic": False, "rating": 4.8,
+             "image_url": "https://images.unsplash.com/photo-1416879595882-3373a0480b5b?w=600&q=80"},
+        ]
+
+        # Idempotent insert — skip existing products by name
+        seeded_count = 0
+        for p_data in all_products:
+            existing_product = db.query(Product).filter(Product.name == p_data["name"]).first()
+            if existing_product:
+                # Update image_url if missing on existing product
+                if not existing_product.image_url and p_data.get("image_url"):
+                    existing_product.image_url = p_data["image_url"]
+                continue
+
+            cat_slug = p_data.pop("category")
+            cat_obj = cat_map.get(cat_slug)
+            if not cat_obj:
+                continue
+
+            product = Product(
+                seller_id=seller.id,
+                category_id=cat_obj.id,
+                image_url=p_data.pop("image_url", None),
+                status="APPROVED",
+                **p_data,
+            )
+            db.add(product)
+            seeded_count += 1
+        db.commit()
+
+        # Also ensure existing products (old seed data) have images
+        products_without_images = db.query(Product).filter(
+            (Product.image_url == None) | (Product.image_url == "")
+        ).all()
+        fallback_images = {
+            "Grains & Cereals": "https://images.unsplash.com/photo-1574323347407-f5e1ad6d020b?w=600&q=80",
+            "Organic Pulses & Legumes": "https://images.unsplash.com/photo-1515543904379-3d757afe72e6?w=600&q=80",
+            "Fresh Vegetables & Fruits": "https://images.unsplash.com/photo-1592924357228-91a4daadcfea?w=600&q=80",
+            "Certified Seeds": "https://images.unsplash.com/photo-1416879595882-3373a0480b5b?w=600&q=80",
+            "Bio-Fertilizers & Nutrients": "https://images.unsplash.com/photo-1585314062340-f1a5a7c9328d?w=600&q=80",
+            "Farming Equipment & Tools": "https://images.unsplash.com/photo-1500651230702-0e2d8a49d4ad?w=600&q=80",
+        }
+        default_fallback = "https://images.unsplash.com/photo-1574943320219-553eb213f72d?w=600&q=80"
+        for p in products_without_images:
+            cat_name = p.category.name if p.category else ""
+            p.image_url = fallback_images.get(cat_name, default_fallback)
+        db.commit()
+
+        if seeded_count > 0:
+            print(f"Seeded {seeded_count} new marketplace products with images.")
 
         # 8. Farming Tips
         if db.query(FarmingTip).count() == 0:

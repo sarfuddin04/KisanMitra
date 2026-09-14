@@ -15,7 +15,7 @@ router = APIRouter(prefix="/upload", tags=["Image Upload"])
 
 ALLOWED_TYPES = {"image/jpeg", "image/jpg", "image/png", "image/webp", "image/gif"}
 MAX_SIZE_BYTES = 5 * 1024 * 1024  # 5 MB
-ALLOWED_CATEGORIES = {"mandi", "crop", "fertilizer", "disease", "banner", "general"}
+ALLOWED_CATEGORIES = {"mandi", "crop", "fertilizer", "disease", "banner", "general", "products"}
 
 
 @router.post("/image", dependencies=[Depends(require_admin)])

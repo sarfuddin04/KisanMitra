@@ -34,6 +34,7 @@ import { CartPage } from './pages/farmer/CartPage';
 import { CheckoutPage } from './pages/farmer/CheckoutPage';
 import { OrdersPage } from './pages/farmer/OrdersPage';
 import { MyProductsPage } from './pages/farmer/MyProductsPage';
+import { ProductDetailPage } from './pages/farmer/ProductDetailPage';
 import { NotificationsPage } from './pages/farmer/NotificationsPage';
 import { ProfilePage } from './pages/farmer/ProfilePage';
 import { MandiDetailPage } from './pages/farmer/MandiDetailPage';
@@ -120,6 +121,7 @@ export function App() {
         {/* Shows FarmerLayout if logged in, PublicLayout if guest. */}
         <Route element={<BrowseLayout />}>
           <Route path="/marketplace" element={<MarketplacePage />} />
+          <Route path="/marketplace/products/:id" element={<ProductDetailPage />} />
           <Route path="/market-prices" element={<MarketPricesPage />} />
           <Route path="/mandis/:id" element={<MandiDetailPage />} />
           <Route path="/mandi-map" element={<MandiMapPage />} />

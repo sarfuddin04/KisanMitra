@@ -101,6 +101,187 @@ def get_admin_dashboard_stats(db: Session = Depends(get_db)):
         "crop_distribution": crop_dist
     }
 
+# ==================== ADMIN PRODUCT MANAGEMENT ====================
+
+def _admin_product_to_dict(p: Product) -> dict:
+    """Convert Product ORM to dict for admin views (includes all statuses)."""
+    primary_image = p.image_url
+    images = []
+    if hasattr(p, 'images') and p.images:
+        for img in p.images:
+            images.append({
+                "id": img.id,
+                "image_url": img.image_url,
+                "is_primary": img.is_primary,
+            })
+            if img.is_primary:
+                primary_image = img.image_url
+
+    return {
+        "id": p.id,
+        "seller_id": p.seller_id,
+        "seller_name": p.seller.full_name if p.seller else "Unknown",
+        "seller_phone": p.seller.phone if p.seller else None,
+        "category_id": p.category_id,
+        "category_name": p.category.name if p.category else "General",
+        "name": p.name,
+        "description": p.description,
+        "price": p.price,
+        "unit": p.unit,
+        "stock_quantity": p.stock_quantity,
+        "location": p.location,
+        "state_id": p.state_id,
+        "state_name": p.state_name or (p.state.name if p.state else None),
+        "district_id": p.district_id,
+        "district_name": p.district_name or (p.district.name if p.district else None),
+        "mandi_id": p.mandi_id,
+        "mandi_name": p.mandi_name or (p.mandi.name if p.mandi else None),
+        "image_url": primary_image,
+        "images": images,
+        "is_available": p.is_available,
+        "is_organic": p.is_organic,
+        "status": p.status,
+        "rating": p.rating,
+        "created_at": p.created_at,
+        "updated_at": p.updated_at,
+    }
+
+
+@router.get("/products")
+def admin_list_products(
+    search: Optional[str] = Query(None),
+    status: Optional[str] = Query(None),
+    db: Session = Depends(get_db)
+):
+    """List ALL products regardless of status (admin view)."""
+    query = db.query(Product).options(
+        joinedload(Product.seller),
+        joinedload(Product.category),
+        joinedload(Product.images),
+        joinedload(Product.state),
+        joinedload(Product.district),
+        joinedload(Product.mandi),
+    )
+    if status:
+        query = query.filter(Product.status == status)
+    if search:
+        query = query.filter(
+            Product.name.ilike(f"%{search}%") |
+            Product.description.ilike(f"%{search}%") |
+            Product.location.ilike(f"%{search}%") |
+            Product.state_name.ilike(f"%{search}%") |
+            Product.mandi_name.ilike(f"%{search}%")
+        )
+    products = query.order_by(Product.created_at.desc()).limit(500).all()
+    return [_admin_product_to_dict(p) for p in products]
+
+
+@router.post("/products")
+def admin_create_product(req: dict, db: Session = Depends(get_db)):
+    """Admin creates a product (auto-approved)."""
+    # Find admin user for seller_id
+    from app.core.deps import require_admin
+    admin_user = db.query(User).join(Role).filter(Role.name == "ADMIN").first()
+    seller_id = req.get("seller_id") or (admin_user.id if admin_user else 1)
+
+    state_name = district_name = mandi_name = None
+    if req.get("state_id"):
+        s = db.query(State).filter(State.id == req["state_id"]).first()
+        state_name = s.name if s else None
+    if req.get("district_id"):
+        d = db.query(District).filter(District.id == req["district_id"]).first()
+        district_name = d.name if d else None
+    if req.get("mandi_id"):
+        m = db.query(Mandi).filter(Mandi.id == req["mandi_id"]).first()
+        mandi_name = m.name if m else None
+
+    product = Product(
+        seller_id=seller_id,
+        category_id=req.get("category_id"),
+        name=req.get("name"),
+        description=req.get("description"),
+        price=float(req.get("price", 0)),
+        unit=req.get("unit", "kg"),
+        stock_quantity=float(req.get("stock_quantity", 100)),
+        location=req.get("location", ""),
+        state_id=req.get("state_id"),
+        district_id=req.get("district_id"),
+        mandi_id=req.get("mandi_id"),
+        state_name=state_name,
+        district_name=district_name,
+        mandi_name=mandi_name,
+        image_url=req.get("image_url"),
+        is_available=req.get("is_available", True),
+        is_organic=req.get("is_organic", False),
+        status="APPROVED",
+    )
+    db.add(product)
+    db.commit()
+    db.refresh(product)
+    return _admin_product_to_dict(product)
+
+
+@router.put("/products/{product_id}")
+def admin_update_product(product_id: int, req: dict, db: Session = Depends(get_db)):
+    """Admin can update any product."""
+    p = db.query(Product).filter(Product.id == product_id).first()
+    if not p:
+        raise HTTPException(status_code=404, detail="Product not found.")
+
+    updatable = [
+        "name", "description", "price", "unit", "stock_quantity", "location",
+        "image_url", "is_available", "is_organic", "category_id",
+        "state_id", "district_id", "mandi_id", "status",
+    ]
+    for k in updatable:
+        if k in req:
+            setattr(p, k, req[k])
+
+    if req.get("state_id"):
+        s = db.query(State).filter(State.id == req["state_id"]).first()
+        p.state_name = s.name if s else None
+    if req.get("district_id"):
+        d = db.query(District).filter(District.id == req["district_id"]).first()
+        p.district_name = d.name if d else None
+    if req.get("mandi_id"):
+        m = db.query(Mandi).filter(Mandi.id == req["mandi_id"]).first()
+        p.mandi_name = m.name if m else None
+
+    db.commit()
+    db.refresh(p)
+    return _admin_product_to_dict(p)
+
+
+@router.put("/products/{product_id}/approve")
+def admin_approve_product(product_id: int, db: Session = Depends(get_db)):
+    p = db.query(Product).filter(Product.id == product_id).first()
+    if not p:
+        raise HTTPException(status_code=404, detail="Product not found.")
+    p.status = "APPROVED"
+    db.commit()
+    return {"message": f"Product '{p.name}' approved.", "status": "APPROVED"}
+
+
+@router.put("/products/{product_id}/reject")
+def admin_reject_product(product_id: int, db: Session = Depends(get_db)):
+    p = db.query(Product).filter(Product.id == product_id).first()
+    if not p:
+        raise HTTPException(status_code=404, detail="Product not found.")
+    p.status = "REJECTED"
+    db.commit()
+    return {"message": f"Product '{p.name}' rejected.", "status": "REJECTED"}
+
+
+@router.delete("/products/{product_id}")
+def admin_delete_product(product_id: int, db: Session = Depends(get_db)):
+    p = db.query(Product).filter(Product.id == product_id).first()
+    if not p:
+        raise HTTPException(status_code=404, detail="Product not found.")
+    db.delete(p)
+    db.commit()
+    return {"message": f"Product '{p.name}' deleted permanently."}
+
+
 # ==================== 2. USERS ====================
 @router.get("/users", response_model=List[UserOut])
 def list_users(search: Optional[str] = Query(None), db: Session = Depends(get_db)):
