@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import {
   MapPin, Search, Navigation, Filter, ChevronDown, ExternalLink,
   Clock, Phone, Wheat, Store, X, Crosshair, Loader2, Map as MapIcon,
-  List, SlidersHorizontal, ChevronRight, Star
+  List, SlidersHorizontal, ChevronRight, Star, AlertTriangle
 } from 'lucide-react';
 import { APIProvider, Map, AdvancedMarker, InfoWindow, useMap } from '@vis.gl/react-google-maps';
 import { MarkerClusterer } from '@googlemaps/markerclusterer';
@@ -22,6 +22,73 @@ const RADIUS_OPTIONS = [
   { value: 50, label: '50 km' },
   { value: 100, label: '100 km' },
 ];
+
+// ═══════════════════════════════════════════════════════
+//  MAP UNAVAILABLE FALLBACK
+// ═══════════════════════════════════════════════════════
+function MapUnavailableFallback({ reason }) {
+  const messages = {
+    'missing-key': {
+      title: 'Map temporarily unavailable',
+      detail: 'Google Maps is not configured for this deployment. The mandi list and all other features remain fully functional.',
+    },
+    'load-error': {
+      title: 'Map temporarily unavailable',
+      detail: 'Google Maps could not be loaded. This may be due to a configuration or network issue. Please try again later.',
+    },
+    'api-error': {
+      title: 'Map temporarily unavailable',
+      detail: 'Google Maps encountered a loading error. Please verify the Maps API configuration and try again.',
+    },
+  };
+  const msg = messages[reason] || messages['load-error'];
+  return (
+    <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl">
+      <div className="text-center p-8 max-w-xs">
+        <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-amber-50 flex items-center justify-center">
+          <AlertTriangle className="w-8 h-8 text-amber-400" />
+        </div>
+        <h3 className="text-base font-black text-gray-800 mb-2">{msg.title}</h3>
+        <p className="text-xs text-gray-500 leading-relaxed">{msg.detail}</p>
+        <p className="text-[10px] text-gray-400 mt-3">Use the list view to browse all mandis →</p>
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════
+//  GOOGLE MAPS ERROR BOUNDARY
+// ═══════════════════════════════════════════════════════
+class MapErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false };
+  }
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+  componentDidCatch(error, info) {
+    // Log developer-friendly diagnostics without exposing secrets
+    const errorMsg = error?.message || '';
+    if (errorMsg.includes('ApiNotActivatedMapError')) {
+      console.warn('[KisanMitra Maps] Google Maps JavaScript API is not enabled for this project. Enable it at https://console.cloud.google.com/apis/library/maps-backend.googleapis.com');
+    } else if (errorMsg.includes('InvalidKeyMapError')) {
+      console.warn('[KisanMitra Maps] The provided Google Maps API key is invalid. Check your key at https://console.cloud.google.com/apis/credentials');
+    } else if (errorMsg.includes('RefererNotAllowedMapError')) {
+      console.warn('[KisanMitra Maps] This domain is not authorized for this Google Maps API key. Add the domain to the HTTP referrer restrictions at https://console.cloud.google.com/apis/credentials');
+    } else if (errorMsg.includes('BillingNotEnabledMapError') || errorMsg.includes('OverQueryLimit')) {
+      console.warn('[KisanMitra Maps] Billing is not enabled or quota exceeded for the Google Maps project. Visit https://console.cloud.google.com/billing');
+    } else {
+      console.warn('[KisanMitra Maps] Map failed to load:', errorMsg);
+    }
+  }
+  render() {
+    if (this.state.hasError) {
+      return <MapUnavailableFallback reason="api-error" />;
+    }
+    return this.props.children;
+  }
+}
 
 // ═══════════════════════════════════════════════════════
 //  MARKER CLUSTERING COMPONENT
@@ -204,9 +271,10 @@ export const MandiMapPage = () => {
   const [loading, setLoading] = useState(true);
   const [selectedMandi, setSelectedMandi] = useState(null);
   const [showFilters, setShowFilters] = useState(false);
-  const [viewMode, setViewMode] = useState('split'); // 'split' | 'map' | 'list'
+  const [viewMode, setViewMode] = useState(GOOGLE_MAPS_KEY ? 'split' : 'list'); // default to list if no map key
 
   const searchTimeoutRef = useRef(null);
+  const mapAvailable = Boolean(GOOGLE_MAPS_KEY);
 
   // Load filter options
   useEffect(() => {
@@ -323,20 +391,6 @@ export const MandiMapPage = () => {
     return INDIA_ZOOM;
   }, [useNearby, userLat, selectedDistrictId, selectedStateId]);
 
-  if (!GOOGLE_MAPS_KEY) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
-        <div className="bg-white rounded-3xl shadow-xl p-8 max-w-md text-center">
-          <MapIcon className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-          <h2 className="text-xl font-black text-gray-900 mb-2">Google Maps API Key Required</h2>
-          <p className="text-sm text-gray-500">
-            Add <code className="bg-gray-100 px-2 py-1 rounded text-xs font-mono">VITE_GOOGLE_MAPS_API_KEY</code> to your <code className="bg-gray-100 px-2 py-1 rounded text-xs font-mono">frontend/.env</code> file to enable the Mandi Map.
-          </p>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
@@ -432,16 +486,18 @@ export const MandiMapPage = () => {
               {/* View Mode */}
               <div className="hidden md:flex items-center border border-gray-300 rounded-xl overflow-hidden">
                 {[
-                  { mode: 'split', icon: <span className="text-[10px] font-black">⊞</span>, label: 'Split' },
-                  { mode: 'map', icon: <MapIcon className="w-3.5 h-3.5" />, label: 'Map' },
-                  { mode: 'list', icon: <List className="w-3.5 h-3.5" />, label: 'List' },
+                  { mode: 'split', icon: <span className="text-[10px] font-black">⊞</span>, label: 'Split', needsMap: true },
+                  { mode: 'map', icon: <MapIcon className="w-3.5 h-3.5" />, label: 'Map', needsMap: true },
+                  { mode: 'list', icon: <List className="w-3.5 h-3.5" />, label: 'List', needsMap: false },
                 ].map(v => (
                   <button
                     key={v.mode}
                     onClick={() => setViewMode(v.mode)}
+                    disabled={v.needsMap && !mapAvailable}
+                    title={v.needsMap && !mapAvailable ? 'Map view requires Google Maps configuration' : ''}
                     className={`flex items-center gap-1 px-3 py-2.5 text-xs font-bold transition-all ${
                       viewMode === v.mode ? 'bg-emerald-600 text-white' : 'text-gray-600 hover:bg-gray-50'
-                    }`}
+                    } ${v.needsMap && !mapAvailable ? 'opacity-40 cursor-not-allowed' : ''}`}
                   >
                     {v.icon}
                   </button>
@@ -498,66 +554,72 @@ export const MandiMapPage = () => {
           {/* Map Panel */}
           {viewMode !== 'list' && (
             <div className={`${viewMode === 'split' ? 'md:w-3/5' : 'w-full'} h-[50vh] md:h-full relative`}>
-              <APIProvider apiKey={GOOGLE_MAPS_KEY}>
-                <Map
-                  defaultCenter={mapCenter}
-                  defaultZoom={mapZoom}
-                  center={mapCenter}
-                  zoom={mapZoom}
-                  mapId="mandi-map-main"
-                  gestureHandling="greedy"
-                  disableDefaultUI={false}
-                  className="w-full h-full"
-                >
-                  <ClusteredMarkers
-                    mandis={mandis}
-                    onMarkerClick={handleMarkerClick}
-                    selectedId={selectedMandi?.id}
-                  />
-                  <UserLocationMarker lat={userLat} lon={userLon} />
-
-                  {/* Info Window */}
-                  {selectedMandi && selectedMandi.latitude && (
-                    <InfoWindow
-                      position={{ lat: selectedMandi.latitude, lng: selectedMandi.longitude }}
-                      onCloseClick={() => setSelectedMandi(null)}
-                      pixelOffset={[0, -40]}
+              {mapAvailable ? (
+                <MapErrorBoundary>
+                  <APIProvider apiKey={GOOGLE_MAPS_KEY}>
+                    <Map
+                      defaultCenter={mapCenter}
+                      defaultZoom={mapZoom}
+                      center={mapCenter}
+                      zoom={mapZoom}
+                      mapId="mandi-map-main"
+                      gestureHandling="greedy"
+                      disableDefaultUI={false}
+                      className="w-full h-full"
                     >
-                      <div className="p-2 min-w-[200px] max-w-[280px]">
-                        <h3 className="font-black text-gray-900 text-sm">{selectedMandi.name}</h3>
-                        <p className="text-xs text-gray-500 mt-0.5">
-                          {selectedMandi.district_name}{selectedMandi.state_name ? `, ${selectedMandi.state_name}` : ''}
-                        </p>
-                        {selectedMandi.distance_km != null && (
-                          <p className="text-xs text-blue-600 font-bold mt-1">📍 {selectedMandi.distance_km} km away</p>
-                        )}
-                        {selectedMandi.crops && selectedMandi.crops.length > 0 && (
-                          <p className="text-xs text-gray-600 mt-1">
-                            🌾 {selectedMandi.crops.slice(0, 5).map(c => typeof c === 'string' ? c : c.name).join(', ')}
-                          </p>
-                        )}
-                        <div className="flex gap-2 mt-2">
-                          <button
-                            onClick={() => handleViewDetails(selectedMandi)}
-                            className="flex-1 text-xs font-bold bg-emerald-600 text-white px-2 py-1.5 rounded-lg hover:bg-emerald-700"
-                          >
-                            Details
-                          </button>
-                          <button
-                            onClick={() => handleGetDirections(selectedMandi)}
-                            className="text-xs font-bold bg-blue-600 text-white px-2 py-1.5 rounded-lg hover:bg-blue-700"
-                          >
-                            Directions
-                          </button>
-                        </div>
-                      </div>
-                    </InfoWindow>
-                  )}
-                </Map>
-              </APIProvider>
+                      <ClusteredMarkers
+                        mandis={mandis}
+                        onMarkerClick={handleMarkerClick}
+                        selectedId={selectedMandi?.id}
+                      />
+                      <UserLocationMarker lat={userLat} lon={userLon} />
+
+                      {/* Info Window */}
+                      {selectedMandi && selectedMandi.latitude && (
+                        <InfoWindow
+                          position={{ lat: selectedMandi.latitude, lng: selectedMandi.longitude }}
+                          onCloseClick={() => setSelectedMandi(null)}
+                          pixelOffset={[0, -40]}
+                        >
+                          <div className="p-2 min-w-[200px] max-w-[280px]">
+                            <h3 className="font-black text-gray-900 text-sm">{selectedMandi.name}</h3>
+                            <p className="text-xs text-gray-500 mt-0.5">
+                              {selectedMandi.district_name}{selectedMandi.state_name ? `, ${selectedMandi.state_name}` : ''}
+                            </p>
+                            {selectedMandi.distance_km != null && (
+                              <p className="text-xs text-blue-600 font-bold mt-1">📍 {selectedMandi.distance_km} km away</p>
+                            )}
+                            {selectedMandi.crops && selectedMandi.crops.length > 0 && (
+                              <p className="text-xs text-gray-600 mt-1">
+                                🌾 {selectedMandi.crops.slice(0, 5).map(c => typeof c === 'string' ? c : c.name).join(', ')}
+                              </p>
+                            )}
+                            <div className="flex gap-2 mt-2">
+                              <button
+                                onClick={() => handleViewDetails(selectedMandi)}
+                                className="flex-1 text-xs font-bold bg-emerald-600 text-white px-2 py-1.5 rounded-lg hover:bg-emerald-700"
+                              >
+                                Details
+                              </button>
+                              <button
+                                onClick={() => handleGetDirections(selectedMandi)}
+                                className="text-xs font-bold bg-blue-600 text-white px-2 py-1.5 rounded-lg hover:bg-blue-700"
+                              >
+                                Directions
+                              </button>
+                            </div>
+                          </div>
+                        </InfoWindow>
+                      )}
+                    </Map>
+                  </APIProvider>
+                </MapErrorBoundary>
+              ) : (
+                <MapUnavailableFallback reason="missing-key" />
+              )}
 
               {/* Loading overlay */}
-              {loading && (
+              {loading && mapAvailable && (
                 <div className="absolute inset-0 bg-white/60 backdrop-blur-sm flex items-center justify-center">
                   <div className="flex items-center gap-2 text-emerald-700">
                     <Loader2 className="w-5 h-5 animate-spin" />

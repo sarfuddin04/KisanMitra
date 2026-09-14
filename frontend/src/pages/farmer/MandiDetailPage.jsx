@@ -164,14 +164,14 @@ export const MandiDetailPage = () => {
       {/* Map + Weather Row */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Map Section */}
-        {GOOGLE_MAPS_KEY && mandi.latitude && mandi.longitude && (
-          <div className="bg-white rounded-3xl border border-gray-200/80 shadow-xs overflow-hidden">
-            <div className="p-4 border-b border-gray-100">
-              <h3 className="text-sm font-black text-gray-900 flex items-center gap-2">
-                <MapPin className="w-4 h-4 text-emerald-600" /> Mandi Location
-              </h3>
-            </div>
-            <div className="h-64">
+        <div className="bg-white rounded-3xl border border-gray-200/80 shadow-xs overflow-hidden">
+          <div className="p-4 border-b border-gray-100">
+            <h3 className="text-sm font-black text-gray-900 flex items-center gap-2">
+              <MapPin className="w-4 h-4 text-emerald-600" /> Mandi Location
+            </h3>
+          </div>
+          <div className="h-64">
+            {GOOGLE_MAPS_KEY && mandi.latitude && mandi.longitude ? (
               <APIProvider apiKey={GOOGLE_MAPS_KEY}>
                 <Map
                   defaultCenter={{ lat: mandi.latitude, lng: mandi.longitude }}
@@ -187,9 +187,19 @@ export const MandiDetailPage = () => {
                   </AdvancedMarker>
                 </Map>
               </APIProvider>
-            </div>
+            ) : (
+              <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-gray-50 to-gray-100">
+                <div className="text-center p-4">
+                  <MapPin className="w-8 h-8 text-gray-300 mx-auto mb-2" />
+                  <p className="text-xs font-bold text-gray-500">Map temporarily unavailable</p>
+                  <p className="text-[10px] text-gray-400 mt-1">
+                    {!mandi.latitude ? 'Location coordinates not available for this mandi.' : 'Google Maps is not configured.'}
+                  </p>
+                </div>
+              </div>
+            )}
           </div>
-        )}
+        </div>
 
         {/* Weather at Mandi */}
         <div className="bg-white rounded-3xl border border-gray-200/80 shadow-xs overflow-hidden">
