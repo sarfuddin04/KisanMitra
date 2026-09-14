@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Settings, Save, CheckCircle2, AlertCircle, Shield, Sliders } from 'lucide-react';
+import { Settings, Save, CheckCircle2, AlertCircle, Shield, Sliders, CloudSun, Loader2 } from 'lucide-react';
 import api from '../../services/api';
 
 export const AdminSettings = () => {
@@ -8,6 +8,8 @@ export const AdminSettings = () => {
   const [saving, setSaving] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState('');
+  const [weatherStatus, setWeatherStatus] = useState(null);
+  const [weatherLoading, setWeatherLoading] = useState(true);
 
   const fetchSettings = async () => {
     setLoading(true);
@@ -23,6 +25,12 @@ export const AdminSettings = () => {
 
   useEffect(() => {
     fetchSettings();
+    // Fetch weather integration status
+    setWeatherLoading(true);
+    api.get('/weather/status')
+      .then(r => setWeatherStatus(r.data))
+      .catch(() => setWeatherStatus({ configured: false, status: 'Error', message: 'Could not reach weather service.' }))
+      .finally(() => setWeatherLoading(false));
   }, []);
 
   const handleChange = (key, value) => {
@@ -174,6 +182,53 @@ export const AdminSettings = () => {
 
         </form>
 
+      </div>
+
+      {/* Weather Integration Status */}
+      <div className="bg-slate-900/80 rounded-3xl p-6 sm:p-8 border border-slate-800 shadow-md space-y-4">
+        <h4 className="text-xs font-bold text-sky-300 uppercase tracking-wider pb-2 border-b border-slate-800 flex items-center space-x-2">
+          <CloudSun className="w-4 h-4" />
+          <span>Weather API Integration</span>
+        </h4>
+
+        {weatherLoading ? (
+          <div className="flex items-center gap-2 text-xs text-slate-400">
+            <Loader2 className="w-4 h-4 animate-spin" /> Checking weather service...
+          </div>
+        ) : weatherStatus ? (
+          <div className="space-y-3">
+            <div className="flex items-center gap-3">
+              <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold ${
+                weatherStatus.configured
+                  ? 'bg-emerald-950/60 text-emerald-300 border border-emerald-800'
+                  : 'bg-red-950/60 text-red-300 border border-red-800'
+              }`}>
+                {weatherStatus.configured ? '✓ Connected' : '✕ Not Configured'}
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+              <div className="p-3 bg-slate-800/60 rounded-xl border border-slate-700/80">
+                <p className="text-[10px] uppercase text-slate-500 font-semibold">Provider</p>
+                <p className="font-bold text-white mt-0.5">{weatherStatus.provider || '—'}</p>
+              </div>
+              <div className="p-3 bg-slate-800/60 rounded-xl border border-slate-700/80">
+                <p className="text-[10px] uppercase text-slate-500 font-semibold">Cache TTL</p>
+                <p className="font-bold text-white mt-0.5">{weatherStatus.cache_ttl_minutes ?? '—'} minutes</p>
+              </div>
+              <div className="p-3 bg-slate-800/60 rounded-xl border border-slate-700/80">
+                <p className="text-[10px] uppercase text-slate-500 font-semibold">Status</p>
+                <p className={`font-bold mt-0.5 ${weatherStatus.configured ? 'text-emerald-400' : 'text-red-400'}`}>{weatherStatus.status}</p>
+              </div>
+            </div>
+
+            {!weatherStatus.configured && (
+              <p className="text-[11px] text-amber-400">
+                Set <code className="bg-slate-800 px-1.5 py-0.5 rounded text-amber-300 text-[10px]">WEATHER_API_KEY</code> in your environment variables (Vercel / .env) to enable real-time weather.
+              </p>
+            )}
+          </div>
+        ) : null}
       </div>
 
     </div>

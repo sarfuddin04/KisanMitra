@@ -138,8 +138,8 @@ export const Dashboard = () => {
 
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-4xl font-black text-gray-900">{weather?.temperature || 28}°C</p>
-              <p className="text-xs font-semibold text-emerald-700 mt-0.5">{weather?.condition || 'Mainly Clear'}</p>
+              <p className="text-4xl font-black text-gray-900">{weather?.temperature != null ? `${Math.round(weather.temperature)}°C` : '—'}</p>
+              <p className="text-xs font-semibold text-emerald-700 mt-0.5">{weather?.condition || (weather?.error ? 'Not available' : '—')}</p>
             </div>
             <div className="w-16 h-16 rounded-2xl bg-sky-50 text-sky-600 flex items-center justify-center overflow-hidden">
               {weather?.icon_url ? (
@@ -153,15 +153,15 @@ export const Dashboard = () => {
           <div className="grid grid-cols-3 gap-2 pt-2 text-center text-xs">
             <div className="bg-gray-50 p-2 rounded-xl">
               <span className="text-gray-400 block text-[10px]">Humidity</span>
-              <span className="font-bold text-gray-800">{weather?.humidity || 65}%</span>
+              <span className="font-bold text-gray-800">{weather?.humidity != null ? `${weather.humidity}%` : '—'}</span>
             </div>
             <div className="bg-gray-50 p-2 rounded-xl">
               <span className="text-gray-400 block text-[10px]">Rain Chance</span>
-              <span className="font-bold text-gray-800">{weather?.forecast_daily?.[0]?.rain_probability || 10}%</span>
+              <span className="font-bold text-gray-800">{weather?.forecast_daily?.[0]?.chance_of_rain != null ? `${weather.forecast_daily[0].chance_of_rain}%` : '—'}</span>
             </div>
             <div className="bg-gray-50 p-2 rounded-xl">
               <span className="text-gray-400 block text-[10px]">Wind</span>
-              <span className="font-bold text-gray-800">{weather?.wind_speed || 12} km/h</span>
+              <span className="font-bold text-gray-800">{weather?.wind_speed != null ? `${weather.wind_speed} km/h` : '—'}</span>
             </div>
           </div>
         </div>

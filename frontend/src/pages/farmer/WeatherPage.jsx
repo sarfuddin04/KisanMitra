@@ -130,7 +130,9 @@ export const WeatherPage = () => {
           <AlertCircle className="w-10 h-10 text-amber-500 mx-auto mb-3" />
           <p className="text-sm font-bold text-amber-900">{error}</p>
           <p className="text-xs text-amber-600 mt-1">
-            Ensure WEATHER_API_KEY is set in the backend .env file.
+            {error.includes('unavailable') || error.includes('not configured')
+              ? 'The weather service may not be configured yet. Please contact the administrator.'
+              : 'Please try again or search for a different location.'}
           </p>
         </div>
       )}

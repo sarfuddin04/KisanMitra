@@ -10,8 +10,32 @@ from fastapi import APIRouter, Query
 from typing import Optional
 
 from app.services.weather_service import get_current_weather, get_weather_forecast
+from app.core.config import settings
 
 router = APIRouter(prefix="/weather", tags=["Weather"])
+
+
+@router.get("/status")
+def weather_status():
+    """
+    Weather integration health check.
+    Returns configuration status WITHOUT exposing the API key.
+    """
+    key = (settings.WEATHER_API_KEY or "").strip()
+    is_configured = bool(key) and key not in ("", "YOUR_API_KEY", "demo-key", "test-key")
+
+    return {
+        "configured": is_configured,
+        "provider": "WeatherAPI.com",
+        "base_url": settings.WEATHER_API_BASE_URL,
+        "cache_ttl_minutes": settings.WEATHER_CACHE_MINUTES,
+        "status": "Connected" if is_configured else "Not Configured",
+        "message": (
+            "Weather service is active and ready."
+            if is_configured
+            else "WEATHER_API_KEY environment variable is not set. Weather data will be unavailable."
+        ),
+    }
 
 
 @router.get("/current")
