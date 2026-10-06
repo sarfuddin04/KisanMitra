@@ -18,11 +18,11 @@ class Settings(BaseSettings):
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 7  # 7 days
     
-    # Database
+    # Database — auto-fix Render's postgres:// to postgresql+psycopg2://
     DATABASE_URL: str = os.getenv(
         "DATABASE_URL",
         "postgresql+psycopg2://kisanmitra_user:KisanMitra2026@localhost:5432/kisanmitra"
-    )
+    ).replace("postgres://", "postgresql+psycopg2://", 1)
     
     # External APIs
     GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY", "")
