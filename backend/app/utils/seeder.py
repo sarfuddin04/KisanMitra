@@ -58,6 +58,11 @@ def seed_database(db: Session = None):
                 bio="Agricultural Systems Administrator"
             )
             db.add(admin_profile)
+        else:
+            # Always ensure admin password is correct on every startup
+            admin_user.password_hash = hash_password("Admin@123")
+            admin_user.is_active = True
+            admin_user.is_verified = True
 
         farmer_user = db.query(User).filter(User.email == "farmer@kisanmitra.ai").first()
         if not farmer_user:
