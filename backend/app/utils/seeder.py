@@ -31,14 +31,16 @@ def seed_database(db: Session = None):
         db.commit()
 
         # 2. Default Users
-        admin_user = db.query(User).filter(User.email == "admin@kisanmitra.ai").first()
+        admin_user = db.query(User).filter(
+            (User.email == "admin@kisanmitra.com") | (User.email == "admin@kisanmitra.ai")
+        ).first()
         if not admin_user:
             admin_user = User(
                 role_id=admin_role.id,
                 full_name="KisanMitra Admin",
-                email="admin@kisanmitra.ai",
+                email="admin@kisanmitra.com",
                 phone="9876543210",
-                password_hash=hash_password("Admin@123"),
+                password_hash=hash_password("KisanMitra@2026"),
                 is_active=True,
                 is_verified=True,
                 preferred_language="en"
@@ -59,8 +61,9 @@ def seed_database(db: Session = None):
             )
             db.add(admin_profile)
         else:
-            # Always ensure admin password is correct on every startup
-            admin_user.password_hash = hash_password("Admin@123")
+            # Always ensure admin credentials are correct on every startup
+            admin_user.email = "admin@kisanmitra.com"
+            admin_user.password_hash = hash_password("KisanMitra@2026")
             admin_user.is_active = True
             admin_user.is_verified = True
 
