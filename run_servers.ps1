@@ -9,5 +9,4 @@ Start-Process powershell -ArgumentList "-NoExit", "-Command", "cd frontend; npm 
 Write-Host "Backend API: http://127.0.0.1:8000" -ForegroundColor Cyan
 Write-Host "API Docs (Swagger): http://127.0.0.1:8000/docs" -ForegroundColor Cyan
 Write-Host "Frontend Portal: http://localhost:5173" -ForegroundColor Yellow
-Write-Host "`nDemo Farmer Login: farmer@kisanmitra.ai / Farmer@123"
-Write-Host "Demo Admin Login: admin@kisanmitra.ai / Admin@123`n"
+Write-Host "`nDemo credentials are configured in backend\.env (see .env.example)`n"

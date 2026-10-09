@@ -12,6 +12,5 @@ echo Backend API: http://127.0.0.1:8000
 echo API Docs (Swagger): http://127.0.0.1:8000/docs
 echo Frontend Portal: http://localhost:5173
 echo.
-echo Demo Farmer Login: farmer@kisanmitra.ai / Farmer@123
-echo Demo Admin Login: admin@kisanmitra.ai / Admin@123
+echo Demo credentials are configured in backend\.env (see .env.example)
 echo.

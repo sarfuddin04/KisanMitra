@@ -31,17 +31,20 @@ def seed_database(db: Session = None):
             db.add(farmer_role)
         db.commit()
 
-        # 2. Default Users
+        # 2. Default Users (only seed if passwords are configured in env)
+        admin_pwd = settings.ADMIN_PASSWORD
+        farmer_pwd = settings.FARMER_PASSWORD
+
         admin_user = db.query(User).filter(
             (User.email == "admin@kisanmitra.com") | (User.email == "admin@kisanmitra.ai")
         ).first()
-        if not admin_user:
+        if not admin_user and admin_pwd:
             admin_user = User(
                 role_id=admin_role.id,
                 full_name="KisanMitra Admin",
                 email="admin@kisanmitra.com",
                 phone="9876543210",
-                password_hash=hash_password(settings.ADMIN_PASSWORD),
+                password_hash=hash_password(admin_pwd),
                 is_active=True,
                 is_verified=True,
                 preferred_language="en"
@@ -61,21 +64,21 @@ def seed_database(db: Session = None):
                 bio="Agricultural Systems Administrator"
             )
             db.add(admin_profile)
-        else:
+        elif admin_user and admin_pwd:
             # Always ensure admin credentials are correct on every startup
             admin_user.email = "admin@kisanmitra.com"
-            admin_user.password_hash = hash_password(settings.ADMIN_PASSWORD)
+            admin_user.password_hash = hash_password(admin_pwd)
             admin_user.is_active = True
             admin_user.is_verified = True
 
         farmer_user = db.query(User).filter(User.email == "farmer@kisanmitra.ai").first()
-        if not farmer_user:
+        if not farmer_user and farmer_pwd:
             farmer_user = User(
                 role_id=farmer_role.id,
                 full_name="Rameshwar Singh",
                 email="farmer@kisanmitra.ai",
                 phone="9812345678",
-                password_hash=hash_password(settings.FARMER_PASSWORD),
+                password_hash=hash_password(farmer_pwd),
                 is_active=True,
                 is_verified=True,
                 preferred_language="hi"

@@ -24,9 +24,9 @@ class Settings(BaseSettings):
         "sqlite:///kisanmitra.db"
     ).replace("postgres://", "postgresql+psycopg2://", 1)
     
-    # Default seed credentials (read from env, never hardcode)
-    ADMIN_PASSWORD: str = os.getenv("ADMIN_PASSWORD", "KisanMitra@2026")
-    FARMER_PASSWORD: str = os.getenv("FARMER_PASSWORD", "Farmer@123")
+    # Default seed credentials (MUST be set in .env or environment)
+    ADMIN_PASSWORD: str = os.getenv("ADMIN_PASSWORD", "")
+    FARMER_PASSWORD: str = os.getenv("FARMER_PASSWORD", "")
     
     # External APIs
     GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY", "")

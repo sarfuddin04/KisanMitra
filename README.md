@@ -64,10 +64,11 @@ Double-click `run_servers.bat` in the root folder.
 
 ## 🔑 Demo Credentials (Pre-seeded)
 
-| Role | Email | Password | Access Portal |
-| :--- | :--- | :--- | :--- |
-| **Farmer (Demo)** | `farmer@kisanmitra.ai` | `Farmer@123` | `http://localhost:5173/login` |
-| **Administrator** | `admin@kisanmitra.ai` | `Admin@123` | `http://localhost:5173/admin/login` |
+Demo credentials are configured via environment variables in `backend/.env`:
+- **Admin**: `admin@kisanmitra.com` — password set in `ADMIN_PASSWORD` env var
+- **Farmer**: `farmer@kisanmitra.ai` — password set in `FARMER_PASSWORD` env var
+
+See `backend/.env.example` for setup instructions.
 
 *(Single-click "Prefill Credentials" buttons are also available on the login pages for convenience).*
 
