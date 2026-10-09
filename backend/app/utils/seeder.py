@@ -2,6 +2,7 @@ import datetime
 from sqlalchemy.orm import Session
 from app.core.database import Base, engine, SessionLocal, sync_schema
 from app.core.security import hash_password
+from app.core.config import settings
 from app.models.user import Role, User, UserProfile
 from app.models.agronomy import Crop, Fertilizer, Disease
 from app.models.market import State, District, Mandi, Market, MarketPrice
@@ -40,7 +41,7 @@ def seed_database(db: Session = None):
                 full_name="KisanMitra Admin",
                 email="admin@kisanmitra.com",
                 phone="9876543210",
-                password_hash=hash_password("KisanMitra@2026"),
+                password_hash=hash_password(settings.ADMIN_PASSWORD),
                 is_active=True,
                 is_verified=True,
                 preferred_language="en"
@@ -63,7 +64,7 @@ def seed_database(db: Session = None):
         else:
             # Always ensure admin credentials are correct on every startup
             admin_user.email = "admin@kisanmitra.com"
-            admin_user.password_hash = hash_password("KisanMitra@2026")
+            admin_user.password_hash = hash_password(settings.ADMIN_PASSWORD)
             admin_user.is_active = True
             admin_user.is_verified = True
 
@@ -74,7 +75,7 @@ def seed_database(db: Session = None):
                 full_name="Rameshwar Singh",
                 email="farmer@kisanmitra.ai",
                 phone="9812345678",
-                password_hash=hash_password("Farmer@123"),
+                password_hash=hash_password(settings.FARMER_PASSWORD),
                 is_active=True,
                 is_verified=True,
                 preferred_language="hi"

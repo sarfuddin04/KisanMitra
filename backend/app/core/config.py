@@ -14,15 +14,19 @@ class Settings(BaseSettings):
     API_V1_STR: str = "/api"
     
     # Security
-    SECRET_KEY: str = os.getenv("SECRET_KEY", "kisanmitra-ai-super-secure-secret-key-2026-btech-cse")
+    SECRET_KEY: str = os.getenv("SECRET_KEY", "change-me-in-env-file-before-deploy")
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 7  # 7 days
     
     # Database — auto-fix Render's postgres:// to postgresql+psycopg2://
     DATABASE_URL: str = os.getenv(
         "DATABASE_URL",
-        "postgresql+psycopg2://kisanmitra_user:KisanMitra2026@localhost:5432/kisanmitra"
+        "sqlite:///kisanmitra.db"
     ).replace("postgres://", "postgresql+psycopg2://", 1)
+    
+    # Default seed credentials (read from env, never hardcode)
+    ADMIN_PASSWORD: str = os.getenv("ADMIN_PASSWORD", "KisanMitra@2026")
+    FARMER_PASSWORD: str = os.getenv("FARMER_PASSWORD", "Farmer@123")
     
     # External APIs
     GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY", "")

@@ -5,6 +5,9 @@ backend/.env
 !*.env.example
 !backend/.env.example
 
+# Test files with credentials
+backend/test_conn.py
+
 # Python
 __pycache__/
 *.py[cod]
