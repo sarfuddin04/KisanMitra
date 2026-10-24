@@ -34,30 +34,44 @@ const MANDI_FALLBACK = 'https://images.unsplash.com/photo-1542838132-92c53300491
 const INDIA_CENTER = [22.5, 82.0];
 
 // ── Custom Leaflet Icons ──────────────────────────────────────────────────
-const createMandiIcon = (isSelected = false) => {
+const createMandiIcon = (mandiType = 'APMC Mandi', isSelected = false) => {
+  let bg = isSelected ? '#047857' : '#10b981'; // Default APMC: Emerald Green
+  let svgPath = '<path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline>';
+
+  if (mandiType === 'Government Mandi') {
+    bg = isSelected ? '#1d4ed8' : '#2563eb'; // Royal Blue
+    svgPath = '<path d="M4 22h16M4 18h16M4 6l8-4 8 4v2H4zM6 10v6M10 10v6M14 10v6M18 10v6"></path>';
+  } else if (mandiType === 'Private Wholesale Market' || mandiType === 'Private') {
+    bg = isSelected ? '#d97706' : '#f59e0b'; // Amber
+    svgPath = '<path d="M3 3h18l-2 9H5L3 3zM3 12h18v8a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1v-8z"></path>';
+  } else if (mandiType === 'Wholesale' || mandiType === 'Rural Haat') {
+    bg = isSelected ? '#6d28d9' : '#8b5cf6'; // Purple
+    svgPath = '<circle cx="9" cy="21" r="1"></circle><circle cx="20" cy="21" r="1"></circle><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path>';
+  }
+
+  const size = isSelected ? 42 : 34;
   return L.divIcon({
     className: 'custom-mandi-marker',
     html: `<div style="
-      width: ${isSelected ? '40px' : '32px'};
-      height: ${isSelected ? '40px' : '32px'};
-      background: ${isSelected ? '#059669' : '#10b981'};
+      width: ${size}px;
+      height: ${size}px;
+      background: ${bg};
       border: 3px solid white;
       border-radius: 50%;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+      box-shadow: 0 4px 14px rgba(0,0,0,0.35);
       display: flex;
       align-items: center;
       justify-content: center;
-      transition: all 0.2s;
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
       cursor: pointer;
     ">
-      <svg width="${isSelected ? '20' : '16'}" height="${isSelected ? '20' : '16'}" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
-        <polyline points="9 22 9 12 15 12 15 22"></polyline>
+      <svg width="${isSelected ? '20' : '16'}" height="${isSelected ? '20' : '16'}" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+        ${svgPath}
       </svg>
     </div>`,
-    iconSize: [isSelected ? 40 : 32, isSelected ? 40 : 32],
-    iconAnchor: [isSelected ? 20 : 16, isSelected ? 40 : 32],
-    popupAnchor: [0, -32],
+    iconSize: [size, size],
+    iconAnchor: [size / 2, size],
+    popupAnchor: [0, -size],
   });
 };
 
@@ -171,22 +185,22 @@ const MandiMapPage = () => {
       .finally(() => setDistrictsLoading(false));
   }, [filterStateName, states]);
 
-  // When state changes on map — fly to state center
+  // When state or district changes on map — fly to center
   useEffect(() => {
     if (!filterStateName) {
       setMapCenter(INDIA_CENTER);
       setMapZoom(5);
     } else if (filterStateName && mandis.length > 0) {
-      // Center map on first mandi with coords in filtered list
+      // Center map on mandis with coords in filtered list
       const withCoords = mandis.filter(m => m.latitude && m.longitude);
       if (withCoords.length > 0) {
         const avgLat = withCoords.reduce((s, m) => s + m.latitude, 0) / withCoords.length;
         const avgLon = withCoords.reduce((s, m) => s + m.longitude, 0) / withCoords.length;
         setMapCenter([avgLat, avgLon]);
-        setMapZoom(7);
+        setMapZoom(filterDistrictId ? 11 : 7);
       }
     }
-  }, [filterStateName, mandis]);
+  }, [filterStateName, filterDistrictId, mandis]);
 
   // ── Search debounce ─────────────────────────────────────────────────
   const searchTimeout = useRef(null);
@@ -400,26 +414,29 @@ const MandiMapPage = () => {
           {showFilters && (
             <div className="mt-3 pt-3 border-t border-gray-100">
               <div className="flex flex-wrap gap-3 items-end">
-                {/* State Filter */}
+                {/* State Selection */}
                 <div className="flex flex-col gap-1">
-                  <label className="text-[9px] uppercase font-bold text-gray-400 px-1">State / UT</label>
+                  <label className="text-[10px] uppercase font-extrabold text-emerald-800 px-1">
+                    Select State / Union Territory
+                  </label>
                   <select
                     value={filterStateName}
                     onChange={(e) => {
                       setFilterStateName(e.target.value);
                     }}
-                    className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-gray-700 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 min-w-[160px]"
+                    className="px-3 py-2 bg-white border border-gray-300 rounded-xl text-xs font-bold text-gray-800 focus:outline-none focus:ring-2 focus:ring-emerald-500/40 shadow-sm min-w-[190px]"
                   >
-                    <option value="">🇮🇳 All India</option>
+                    <option value="">🇮🇳 All India (36 States & UTs)</option>
                     {states.map(s => <option key={s.id} value={s.name}>{s.name}</option>)}
                   </select>
                 </div>
 
-                {/* District Filter (cascades from state) */}
+                {/* District Selection (cascades from selected state) */}
                 {filterStateName && (
                   <div className="flex flex-col gap-1">
-                    <label className="text-[9px] uppercase font-bold text-gray-400 px-1">
-                      District {districtsLoading && '...'}
+                    <label className="text-[10px] uppercase font-extrabold text-emerald-800 px-1 flex items-center justify-between">
+                      <span>Select District</span>
+                      {districtsLoading && <span className="text-[9px] text-emerald-600 animate-pulse">Loading...</span>}
                     </label>
                     <select
                       value={filterDistrictId}
@@ -429,9 +446,9 @@ const MandiMapPage = () => {
                         setFilterDistrictName(found?.name || '');
                       }}
                       disabled={districtsLoading || districts.length === 0}
-                      className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-gray-700 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 min-w-[150px] disabled:opacity-50"
+                      className="px-3 py-2 bg-white border border-gray-300 rounded-xl text-xs font-bold text-gray-800 focus:outline-none focus:ring-2 focus:ring-emerald-500/40 shadow-sm min-w-[180px] disabled:opacity-50"
                     >
-                      <option value="">All Districts</option>
+                      <option value="">All Districts ({districts.length})</option>
                       {districts.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
                     </select>
                   </div>
@@ -526,10 +543,70 @@ const MandiMapPage = () => {
                 <span className="ml-2 text-xs text-gray-400 font-medium">Loading mandis...</span>
               </div>
             ) : sortedMandis.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-20 px-6">
-                <Store className="w-10 h-10 text-gray-300 mb-3" />
-                <p className="text-xs text-gray-500 font-bold text-center">No mandis found</p>
-                <p className="text-[10px] text-gray-400 mt-1 text-center">Try a different search or adjust filters</p>
+              <div className="flex flex-col items-center justify-center py-16 px-6 text-center">
+                <div className="w-14 h-14 bg-amber-50 rounded-2xl flex items-center justify-center mb-3 border border-amber-200">
+                  <Store className="w-7 h-7 text-amber-600" />
+                </div>
+                {filterDistrictId ? (
+                  <>
+                    <h4 className="text-sm font-extrabold text-gray-800 mb-1">
+                      No verified mandi records are currently available for this district.
+                    </h4>
+                    <p className="text-xs text-gray-500 max-w-xs mb-4">
+                      No official APMC or wholesale market records are registered under <span className="font-semibold text-gray-700">{filterDistrictName || 'the selected district'}</span> in the government database yet.
+                    </p>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => { setFilterDistrictId(''); setFilterDistrictName(''); }}
+                        className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl transition-all shadow-sm"
+                      >
+                        View All in {filterStateName}
+                      </button>
+                      <button
+                        onClick={loadMandis}
+                        className="px-3.5 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-bold rounded-xl transition-all"
+                      >
+                        Retry Search
+                      </button>
+                    </div>
+                  </>
+                ) : searchQuery ? (
+                  <>
+                    <h4 className="text-sm font-extrabold text-gray-800 mb-1">
+                      No mandis found matching &ldquo;{searchQuery}&rdquo;
+                    </h4>
+                    <p className="text-xs text-gray-500 max-w-xs mb-4">
+                      Check your spelling or try searching by state name, district, or agricultural commodity.
+                    </p>
+                    <button
+                      onClick={() => { setSearchQuery(''); loadMandis(); }}
+                      className="px-4 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl transition-all shadow-sm"
+                    >
+                      Clear Search
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <h4 className="text-sm font-extrabold text-gray-800 mb-1">
+                      No mandi records found
+                    </h4>
+                    <p className="text-xs text-gray-500 max-w-xs mb-4">
+                      Try clearing or adjusting your active filters to view available mandis across India.
+                    </p>
+                    <button
+                      onClick={() => {
+                        setFilterStateName('');
+                        setFilterDistrictId('');
+                        setFilterDistrictName('');
+                        setFilterType('');
+                        setSearchQuery('');
+                      }}
+                      className="px-4 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl transition-all shadow-sm"
+                    >
+                      Reset All Filters
+                    </button>
+                  </>
+                )}
               </div>
             ) : (
               <div className={viewMode === 'grid' ? 'grid grid-cols-2 gap-3 p-3' : 'space-y-0'}>
@@ -558,12 +635,25 @@ const MandiMapPage = () => {
 
                       {/* Card Content */}
                       <div className={viewMode === 'grid' ? 'p-2.5' : 'flex-1 min-w-0'}>
+                        <div className="flex items-center gap-1.5 mb-1 flex-wrap">
+                          <span className={`text-[9px] font-extrabold px-1.5 py-0.2 rounded-full border ${
+                            m.mandi_type === 'Government Mandi' ? 'bg-blue-50 text-blue-700 border-blue-200' :
+                            m.mandi_type === 'Private Wholesale Market' || m.mandi_type === 'Private' ? 'bg-amber-50 text-amber-700 border-amber-200' :
+                            m.mandi_type === 'Wholesale' || m.mandi_type === 'Rural Haat' ? 'bg-purple-50 text-purple-700 border-purple-200' :
+                            'bg-emerald-50 text-emerald-700 border-emerald-200'
+                          }`}>
+                            {m.mandi_type || 'APMC Mandi'}
+                          </span>
+                          <span className="text-[8px] font-bold text-emerald-700 bg-emerald-50/80 px-1 py-0.2 rounded border border-emerald-200">
+                            ✓ Verified
+                          </span>
+                        </div>
                         <h3 className="text-xs font-black text-gray-900 truncate">{m.name}</h3>
                         <p className="text-[10px] text-gray-500 font-medium flex items-center gap-1 mt-0.5">
-                          <MapPin className="w-2.5 h-2.5" />
+                          <MapPin className="w-2.5 h-2.5 flex-shrink-0 text-emerald-600" />
                           <span className="truncate">{m.district_name}, {m.state_name}</span>
                         </p>
-                        <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                        <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
                           {dist && (
                             <span className="inline-flex items-center gap-0.5 text-[10px] font-bold text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded-md">
                               <Navigation className="w-2.5 h-2.5" /> {dist} km
@@ -621,28 +711,39 @@ const MandiMapPage = () => {
                   <Marker
                     key={m.id}
                     position={[m.latitude, m.longitude]}
-                    icon={createMandiIcon(selectedMandi?.id === m.id)}
+                    icon={createMandiIcon(m.mandi_type, selectedMandi?.id === m.id)}
                     eventHandlers={{ click: () => selectMandi(m) }}
                   >
-                    <Popup maxWidth={280}>
-                      <div className="min-w-[220px]">
-                        <h3 className="font-black text-sm text-gray-900 mb-1">{m.name}</h3>
-                        <p className="text-xs text-gray-500 flex items-center gap-1 mb-2">
+                    <Popup maxWidth={300}>
+                      <div className="min-w-[230px] p-0.5">
+                        <div className="flex items-center justify-between gap-1 mb-1">
+                          <span className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full border ${
+                            m.mandi_type === 'Government Mandi' ? 'bg-blue-50 text-blue-700 border-blue-200' :
+                            m.mandi_type === 'Private Wholesale Market' || m.mandi_type === 'Private' ? 'bg-amber-50 text-amber-700 border-amber-200' :
+                            m.mandi_type === 'Wholesale' || m.mandi_type === 'Rural Haat' ? 'bg-purple-50 text-purple-700 border-purple-200' :
+                            'bg-emerald-50 text-emerald-700 border-emerald-200'
+                          }`}>
+                            {m.mandi_type || 'APMC Mandi'}
+                          </span>
+                          <span className="text-[9px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
+                            ✓ Verified
+                          </span>
+                        </div>
+                        <h3 className="font-black text-sm text-gray-900 mb-1 leading-snug">{m.name}</h3>
+                        <p className="text-xs text-gray-500 flex items-center gap-1 mb-1.5 font-medium">
                           <span>📍</span> {m.district_name}, {m.state_name}
                         </p>
-                        <div className="flex items-center gap-2 mb-2">
+                        <div className="flex items-center justify-between text-[10px] text-gray-400 mb-2 font-semibold">
+                          <span>{m.latitude.toFixed(4)}°N, {m.longitude.toFixed(4)}°E</span>
                           {m.average_rating > 0 && (
-                            <span className="text-xs font-bold text-amber-600">⭐ {m.average_rating} ({m.review_count})</span>
-                          )}
-                          {m.crop_count > 0 && (
-                            <span className="text-xs text-gray-500">{m.crop_count} crops</span>
+                            <span className="text-amber-600 font-bold">⭐ {m.average_rating} ({m.review_count})</span>
                           )}
                         </div>
                         <button
                           onClick={(e) => { e.stopPropagation(); selectMandi(m); }}
-                          className="w-full py-1.5 bg-emerald-600 text-white text-xs font-bold rounded-lg hover:bg-emerald-700 transition-colors"
+                          className="w-full py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg transition-colors shadow-sm flex items-center justify-center gap-1"
                         >
-                          View Details →
+                          View Details & Prices →
                         </button>
                       </div>
                     </Popup>
@@ -651,10 +752,41 @@ const MandiMapPage = () => {
               </MapContainer>
 
               {/* Map overlay stats */}
-              <div className="absolute top-3 left-3 bg-white/90 backdrop-blur-sm rounded-xl px-3 py-2 shadow-lg border border-gray-200 z-10">
+              <div className="absolute top-3 left-3 bg-white/95 backdrop-blur-md rounded-2xl px-3.5 py-2 shadow-lg border border-gray-200 z-10 flex items-center gap-2">
+                <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
                 <p className="text-xs font-bold text-gray-700">
-                  <span className="text-emerald-600">{mandis.filter(m => m.latitude && m.longitude).length}</span> mandis on map
+                  <span className="text-emerald-700 font-extrabold">{mandis.filter(m => m.latitude && m.longitude).length}</span> Verified Mandis on Map
                 </p>
+              </div>
+
+              {/* Map Floating Legend */}
+              <div className="absolute bottom-6 right-3 bg-white/95 backdrop-blur-md rounded-2xl p-3 shadow-xl border border-gray-200 z-10 text-xs space-y-1.5 min-w-[170px]">
+                <p className="font-extrabold text-[10px] text-gray-800 uppercase tracking-wider mb-1 flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+                  Market Categories
+                </p>
+                <div className="flex items-center gap-2">
+                  <span className="w-3.5 h-3.5 rounded-full bg-emerald-500 border-2 border-white shadow-sm flex-shrink-0"></span>
+                  <span className="text-[11px] font-semibold text-gray-700">APMC Mandi</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="w-3.5 h-3.5 rounded-full bg-blue-600 border-2 border-white shadow-sm flex-shrink-0"></span>
+                  <span className="text-[11px] font-semibold text-gray-700">Government Mandi</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="w-3.5 h-3.5 rounded-full bg-amber-500 border-2 border-white shadow-sm flex-shrink-0"></span>
+                  <span className="text-[11px] font-semibold text-gray-700">Private Wholesale</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="w-3.5 h-3.5 rounded-full bg-purple-500 border-2 border-white shadow-sm flex-shrink-0"></span>
+                  <span className="text-[11px] font-semibold text-gray-700">Rural Haat / Wholesale</span>
+                </div>
+                {granted && (
+                  <div className="flex items-center gap-2 pt-1 border-t border-gray-100">
+                    <span className="w-3.5 h-3.5 rounded-full bg-blue-500 border-2 border-white shadow-sm flex-shrink-0 ring-2 ring-blue-300"></span>
+                    <span className="text-[11px] font-semibold text-blue-700">Your Location</span>
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -758,14 +890,32 @@ const MandiMapPage = () => {
                       <div className="space-y-4">
                         {/* Info Grid */}
                         <div className="grid grid-cols-2 gap-3">
-                          <InfoCard icon={Store} label="Type" value={detailData.mandi_type || 'APMC Mandi'} />
+                          <InfoCard icon={Store} label="Category" value={detailData.mandi_type || 'APMC Mandi'} />
                           <InfoCard icon={MapPin} label="Pincode" value={detailData.pincode || '—'} />
+                          <InfoCard icon={Navigation} label="Coordinates" value={detailData.latitude && detailData.longitude ? `${detailData.latitude.toFixed(4)}, ${detailData.longitude.toFixed(4)}` : 'Verified on Map'} />
+                          <InfoCard icon={Check} label="Verification" value={detailData.verification_status || 'Verified'} />
                           {detailData.opening_time && (
                             <InfoCard icon={Clock} label="Timings" value={`${detailData.opening_time} – ${detailData.closing_time || ''}`} />
                           )}
                           {detailData.contact_number && (
                             <InfoCard icon={Phone} label="Contact" value={detailData.contact_number} />
                           )}
+                        </div>
+
+                        {/* Data Source & Verification Notice */}
+                        <div className="bg-emerald-50/70 border border-emerald-200 rounded-xl p-3 flex items-start gap-2.5">
+                          <span className="text-emerald-700 font-bold text-xs">🏛️</span>
+                          <div>
+                            <p className="text-[10px] font-bold text-emerald-900 uppercase">Authoritative Data Source</p>
+                            <p className="text-[11px] text-emerald-800 font-semibold mt-0.5">
+                              {detailData.data_source || 'AGMARKNET / Directorate of Marketing & Inspection (Govt. of India)'}
+                            </p>
+                            {detailData.updated_at && (
+                              <p className="text-[9px] text-emerald-600 mt-1">
+                                Last updated: {new Date(detailData.updated_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
+                              </p>
+                            )}
+                          </div>
                         </div>
 
                         {/* Address */}

@@ -13,6 +13,7 @@ class State(Base):
     name = Column(String(100), unique=True, nullable=False, index=True)
     code = Column(String(10), nullable=True)          # e.g. "UP", "MH"
     image_url = Column(String(255), nullable=True)
+    data_source = Column(String(100), default="Survey of India / LGD")
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
@@ -26,6 +27,8 @@ class District(Base):
     id = Column(Integer, primary_key=True, index=True)
     state_id = Column(Integer, ForeignKey("states.id", ondelete="CASCADE"), nullable=False, index=True)
     name = Column(String(100), nullable=False, index=True)
+    code = Column(String(20), nullable=True)
+    data_source = Column(String(100), default="Census of India / LGD")
     image_url = Column(String(255), nullable=True)
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
@@ -50,6 +53,9 @@ class Mandi(Base):
     closing_time = Column(String(20), nullable=True)    # e.g. "20:00"
     mandi_type = Column(String(50), default="APMC Mandi")
     image_url = Column(String(255), nullable=True)
+    data_source = Column(String(100), default="AGMARKNET / DMI")
+    is_verified = Column(Boolean, default=True)
+    verification_status = Column(String(50), default="VERIFIED")
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)

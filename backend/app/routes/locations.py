@@ -265,6 +265,7 @@ def search_mandis(
 
 @router.get("/mandis/map")
 def get_mandis_for_map(
+    q: Optional[str] = Query(None, description="Search query across mandi, district, state, address"),
     state_id: Optional[int] = Query(None),
     state_name: Optional[str] = Query(None, description="Filter by state name (case-insensitive)"),
     district_id: Optional[int] = Query(None),
@@ -281,7 +282,7 @@ def get_mandis_for_map(
 ):
     """
     Lightweight mandi data for map markers.
-    Supports map-bounds filtering, state/district name filtering, and mandi_type filtering.
+    Supports search query 'q', map-bounds filtering, state/district name filtering, and mandi_type filtering.
     """
     query = db.query(Mandi).options(
         joinedload(Mandi.district).joinedload(District.state),
@@ -301,6 +302,19 @@ def get_mandis_for_map(
         query = query.filter(District.state_id == state_id)
     elif state_name and isinstance(state_name, str) and state_name.strip():
         query = query.filter(State.name.ilike(f"%{state_name.strip()}%"))
+
+    # Direct keyword search across mandi name, district name, state name, address, pincode
+    if q and isinstance(q, str) and q.strip():
+        search_term = f"%{q.strip()}%"
+        query = query.filter(
+            or_(
+                Mandi.name.ilike(search_term),
+                Mandi.address.ilike(search_term),
+                Mandi.pincode.ilike(search_term),
+                District.name.ilike(search_term),
+                State.name.ilike(search_term),
+            )
+        )
 
     # Mandi type filter
     if mandi_type and isinstance(mandi_type, str) and mandi_type.strip():
@@ -365,6 +379,10 @@ def get_mandis_for_map(
             "address": m.address,
             "contact_number": m.contact_number,
             "pincode": m.pincode,
+            "data_source": getattr(m, 'data_source', 'AGMARKNET / DMI') or 'AGMARKNET / DMI',
+            "is_verified": getattr(m, 'is_verified', True) if getattr(m, 'is_verified', None) is not None else True,
+            "verification_status": getattr(m, 'verification_status', 'VERIFIED') or 'VERIFIED',
+            "updated_at": m.updated_at.isoformat() if m.updated_at else None,
             "average_rating": rd["average_rating"],
             "review_count": rd["review_count"],
         })

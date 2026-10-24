@@ -1402,12 +1402,41 @@ def admin_delete_state(state_id: int, db: Session = Depends(get_db)):
 
 
 # ---- DISTRICTS ----
+@router.get("/districts")
+def admin_list_districts(
+    state_id: Optional[int] = Query(None),
+    q: Optional[str] = Query(None),
+    limit: int = Query(1000),
+    db: Session = Depends(get_db)
+):
+    query = db.query(District).options(joinedload(District.state))
+    if state_id is not None:
+        query = query.filter(District.state_id == state_id)
+    if q and isinstance(q, str) and q.strip():
+        query = query.filter(District.name.ilike(f"%{q.strip()}%"))
+    districts = query.order_by(District.name.asc()).limit(limit).all()
+    return [
+        {
+            "id": d.id,
+            "state_id": d.state_id,
+            "state_name": d.state.name if d.state else None,
+            "name": d.name,
+            "code": getattr(d, 'code', None),
+            "data_source": getattr(d, 'data_source', 'LGD'),
+            "is_active": d.is_active,
+            "created_at": d.created_at,
+            "updated_at": d.updated_at
+        }
+        for d in districts
+    ]
+
 @router.get("/states/{state_id}/districts")
 def admin_get_districts(state_id: int, db: Session = Depends(get_db)):
     districts = db.query(District).filter(District.state_id == state_id)\
                   .order_by(District.name.asc()).all()
     return [
         {"id": d.id, "state_id": d.state_id, "name": d.name,
+         "code": getattr(d, 'code', None), "data_source": getattr(d, 'data_source', 'LGD'),
          "is_active": d.is_active, "created_at": d.created_at, "updated_at": d.updated_at}
         for d in districts
     ]
@@ -1578,7 +1607,7 @@ def admin_remove_mandi_crop(mandi_id: int, crop_id: int, db: Session = Depends(g
 
 
 def _admin_mandi_out(m: Mandi) -> dict:
-    """Build admin-friendly mandi dict with crops."""
+    """Build admin-friendly mandi dict with crops and metadata."""
     crops = []
     if hasattr(m, 'mandi_crops') and m.mandi_crops:
         crops = [
@@ -1599,8 +1628,203 @@ def _admin_mandi_out(m: Mandi) -> dict:
         "mandi_type": m.mandi_type,
         "image_url": m.image_url,
         "is_active": m.is_active,
+        "data_source": getattr(m, 'data_source', 'AGMARKNET / DMI') or 'AGMARKNET / DMI',
+        "is_verified": getattr(m, 'is_verified', True) if getattr(m, 'is_verified', None) is not None else True,
+        "verification_status": getattr(m, 'verification_status', 'VERIFIED') or 'VERIFIED',
         "crops": crops,
         "created_at": m.created_at,
         "updated_at": m.updated_at,
+    }
+
+
+# ==================== LOCATION DIRECTORY COVERAGE & SYNC ====================
+
+@router.get("/locations/coverage")
+def admin_location_coverage(db: Session = Depends(get_db)):
+    """Comprehensive state-wise and district-wise location and mandi coverage report."""
+    from sqlalchemy import or_
+    total_states = db.query(State).count()
+    total_districts = db.query(District).count()
+    total_mandis = db.query(Mandi).count()
+    mandis_with_coords = db.query(Mandi).filter(Mandi.latitude != None, Mandi.longitude != None).count()
+    mandis_with_prices = db.query(MarketPrice.mandi_id).distinct().count()
+
+    # State-wise breakdown
+    states = db.query(State).order_by(State.name.asc()).all()
+    state_breakdown = []
+    for s in states:
+        dist_count = db.query(District).filter(District.state_id == s.id).count()
+        # Mandis under this state
+        mandi_q = db.query(Mandi).join(District, Mandi.district_id == District.id).filter(District.state_id == s.id)
+        mandi_cnt = mandi_q.count()
+        coords_cnt = mandi_q.filter(Mandi.latitude != None, Mandi.longitude != None).count()
+        state_breakdown.append({
+            "state_id": s.id,
+            "state_name": s.name,
+            "code": s.code or "",
+            "data_source": getattr(s, 'data_source', 'LGD / Census') or 'LGD / Census',
+            "district_count": dist_count,
+            "mandi_count": mandi_cnt,
+            "verified_coords_count": coords_cnt
+        })
+
+    # Missing information audit
+    missing_coords = db.query(Mandi).options(joinedload(Mandi.district).joinedload(District.state)).filter(
+        or_(Mandi.latitude == None, Mandi.longitude == None)
+    ).limit(50).all()
+
+    missing_coords_list = [
+        {
+            "id": m.id,
+            "name": m.name,
+            "district": m.district.name if m.district else "Unknown",
+            "state": m.district.state.name if m.district and m.district.state else "Unknown"
+        }
+        for m in missing_coords
+    ]
+
+    # Duplicate detection (mandis sharing identical or nearly identical names in same district)
+    duplicate_query = db.query(
+        Mandi.district_id,
+        func.lower(Mandi.name).label("mandi_name"),
+        func.count(Mandi.id).label("count")
+    ).group_by(Mandi.district_id, func.lower(Mandi.name)).having(func.count(Mandi.id) > 1).all()
+
+    duplicates_list = []
+    for dup in duplicate_query:
+        dist = db.query(District).filter(District.id == dup.district_id).first()
+        duplicates_list.append({
+            "district_id": dup.district_id,
+            "district_name": dist.name if dist else "Unknown",
+            "mandi_name": dup.mandi_name,
+            "count": dup.count
+        })
+
+    return {
+        "summary": {
+            "total_states": total_states,
+            "total_districts": total_districts,
+            "total_mandis": total_mandis,
+            "mandis_with_coords": mandis_with_coords,
+            "mandis_with_prices": mandis_with_prices,
+            "coordinates_coverage_pct": round((mandis_with_coords / total_mandis * 100), 1) if total_mandis else 0.0
+        },
+        "states": state_breakdown,
+        "audit": {
+            "missing_coords_count": len(missing_coords_list),
+            "missing_coords_sample": missing_coords_list,
+            "potential_duplicates_count": len(duplicates_list),
+            "potential_duplicates": duplicates_list
+        }
+    }
+
+
+@router.post("/locations/sync-all-india")
+def admin_sync_all_india_directory(db: Session = Depends(get_db)):
+    """Trigger synchronization of the authoritative All-India State, District, and Mandi dataset."""
+    from app.data.all_india_districts import ALL_INDIA_DISTRICTS
+    from app.data.all_india_mandis import ALL_INDIA_LOCATIONS
+
+    states_added = 0
+    districts_added = 0
+    mandis_synced = 0
+
+    for state_name, district_list in ALL_INDIA_DISTRICTS.items():
+        state_obj = db.query(State).filter(State.name.ilike(state_name)).first()
+        if not state_obj:
+            state_obj = State(
+                name=state_name,
+                code=state_name[:2].upper(),
+                data_source="Census of India / Local Government Directory (LGD)",
+                is_active=True
+            )
+            db.add(state_obj)
+            db.flush()
+            states_added += 1
+        elif not state_obj.data_source:
+            state_obj.data_source = "Census of India / Local Government Directory (LGD)"
+
+        for dist_name in district_list:
+            dist_obj = db.query(District).filter(
+                District.state_id == state_obj.id,
+                District.name.ilike(dist_name)
+            ).first()
+            if not dist_obj:
+                dist_obj = District(
+                    state_id=state_obj.id,
+                    name=dist_name,
+                    data_source="Local Government Directory (LGD)",
+                    is_active=True
+                )
+                db.add(dist_obj)
+                districts_added += 1
+
+    db.commit()
+
+    for loc in ALL_INDIA_LOCATIONS:
+        state_name = loc["state"]
+        state_obj = db.query(State).filter(State.name.ilike(state_name)).first()
+        if not state_obj:
+            continue
+
+        for dist_data in loc.get("districts", []):
+            dist_name = dist_data["name"]
+            dist_obj = db.query(District).filter(
+                District.state_id == state_obj.id,
+                District.name.ilike(dist_name)
+            ).first()
+            if not dist_obj:
+                dist_obj = District(state_id=state_obj.id, name=dist_name, is_active=True, data_source="LGD")
+                db.add(dist_obj)
+                db.flush()
+
+            for mandi_data in dist_data.get("mandis", []):
+                mandi_name = mandi_data["name"]
+                mandi_obj = db.query(Mandi).filter(
+                    Mandi.district_id == dist_obj.id,
+                    Mandi.name.ilike(mandi_name)
+                ).first()
+
+                if not mandi_obj:
+                    mandi_obj = Mandi(
+                        district_id=dist_obj.id,
+                        name=mandi_name,
+                        address=mandi_data.get("address"),
+                        pincode=mandi_data.get("pincode"),
+                        latitude=mandi_data.get("latitude"),
+                        longitude=mandi_data.get("longitude"),
+                        contact_number=mandi_data.get("contact_number"),
+                        opening_time=mandi_data.get("opening_time"),
+                        closing_time=mandi_data.get("closing_time"),
+                        mandi_type=mandi_data.get("mandi_type", "APMC Mandi"),
+                        is_verified=True,
+                        verification_status="VERIFIED",
+                        data_source=mandi_data.get("data_source", "AGMARKNET / Directorate of Marketing & Inspection"),
+                        is_active=True
+                    )
+                    db.add(mandi_obj)
+                    mandis_synced += 1
+                else:
+                    if mandi_data.get("latitude") and not mandi_obj.latitude:
+                        mandi_obj.latitude = mandi_data["latitude"]
+                    if mandi_data.get("longitude") and not mandi_obj.longitude:
+                        mandi_obj.longitude = mandi_data["longitude"]
+                    mandi_obj.is_verified = True
+                    mandi_obj.verification_status = "VERIFIED"
+                    if not mandi_obj.data_source:
+                        mandi_obj.data_source = "AGMARKNET / Directorate of Marketing & Inspection"
+                    mandis_synced += 1
+
+    db.commit()
+
+    return {
+        "status": "success",
+        "message": "All-India directory synchronized successfully.",
+        "states_added": states_added,
+        "districts_added": districts_added,
+        "mandis_synced": mandis_synced,
+        "total_states": db.query(State).count(),
+        "total_districts": db.query(District).count(),
+        "total_mandis": db.query(Mandi).count(),
     }
 

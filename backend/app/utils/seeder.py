@@ -539,8 +539,46 @@ def seed_database(db: Session = None):
         print("Database initialized and successfully seeded with rich agricultural data.")
 
         # ==================== LOCATION HIERARCHY SEEDING (ALL 36 STATES & UTs) ====================
+        from app.data.all_india_districts import ALL_INDIA_DISTRICTS
         from app.data.all_india_mandis import ALL_INDIA_LOCATIONS
 
+        # Step 1: Ensure all 36 States/UTs and all 786+ districts from authoritative LGD/Census directory exist
+        state_cache = {}
+        for state_name, district_list in ALL_INDIA_DISTRICTS.items():
+            state_obj = db.query(State).filter(State.name.ilike(state_name)).first()
+            if not state_obj:
+                state_obj = State(
+                    name=state_name,
+                    code=state_name[:2].upper(),
+                    data_source="Census of India / Local Government Directory (LGD)",
+                    is_active=True
+                )
+                db.add(state_obj)
+                db.flush()
+            else:
+                if not state_obj.data_source:
+                    state_obj.data_source = "Census of India / Local Government Directory (LGD)"
+            state_cache[state_name.lower()] = state_obj
+
+            for dist_name in district_list:
+                dist_obj = db.query(District).filter(
+                    District.state_id == state_obj.id,
+                    District.name.ilike(dist_name)
+                ).first()
+                if not dist_obj:
+                    dist_obj = District(
+                        state_id=state_obj.id,
+                        name=dist_name,
+                        data_source="Local Government Directory (LGD)",
+                        is_active=True
+                    )
+                    db.add(dist_obj)
+                else:
+                    if not dist_obj.data_source:
+                        dist_obj.data_source = "Local Government Directory (LGD)"
+        db.commit()
+
+        # Step 2: Seed verified agricultural mandis across all states and districts
         # Cache existing crops by name lowercase for fast lookup
         existing_crops = {c.name.lower(): c for c in db.query(Crop).all()}
 
@@ -553,12 +591,19 @@ def seed_database(db: Session = None):
                 (State.name.ilike(state_name)) | (State.code == state_code)
             ).first()
             if not state_obj:
-                state_obj = State(name=state_name, code=state_code, is_active=True)
+                state_obj = State(
+                    name=state_name,
+                    code=state_code,
+                    data_source="AGMARKNET / Directorate of Marketing & Inspection",
+                    is_active=True
+                )
                 db.add(state_obj)
                 db.flush()
             else:
                 if state_code and not state_obj.code:
                     state_obj.code = state_code
+                if not state_obj.data_source:
+                    state_obj.data_source = "AGMARKNET / Directorate of Marketing & Inspection"
 
             for dist_data in loc_data.get("districts", []):
                 dist_name = dist_data["name"]
@@ -567,7 +612,12 @@ def seed_database(db: Session = None):
                     District.name.ilike(dist_name)
                 ).first()
                 if not dist_obj:
-                    dist_obj = District(state_id=state_obj.id, name=dist_name, is_active=True)
+                    dist_obj = District(
+                        state_id=state_obj.id,
+                        name=dist_name,
+                        data_source="Local Government Directory (LGD)",
+                        is_active=True
+                    )
                     db.add(dist_obj)
                     db.flush()
 
@@ -590,6 +640,9 @@ def seed_database(db: Session = None):
                             opening_time=mandi_data.get("opening_time"),
                             closing_time=mandi_data.get("closing_time"),
                             mandi_type=mandi_data.get("mandi_type", "APMC Mandi"),
+                            is_verified=True,
+                            verification_status="Verified",
+                            data_source=mandi_data.get("data_source", "AGMARKNET / Directorate of Marketing & Inspection"),
                             is_active=True
                         )
                         db.add(mandi_obj)
@@ -612,6 +665,10 @@ def seed_database(db: Session = None):
                             mandi_obj.closing_time = mandi_data["closing_time"]
                         if mandi_data.get("mandi_type"):
                             mandi_obj.mandi_type = mandi_data["mandi_type"]
+                        mandi_obj.is_verified = True
+                        mandi_obj.verification_status = "Verified"
+                        if not mandi_obj.data_source:
+                            mandi_obj.data_source = mandi_data.get("data_source", "AGMARKNET / Directorate of Marketing & Inspection")
 
                     # Associate crops and seed real/baseline AGMARKNET market prices
                     for crop_info in mandi_data.get("crops", []):

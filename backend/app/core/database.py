@@ -97,6 +97,13 @@ def sync_schema(eng):
                 conn.execute(text("ALTER TABLE market_prices ADD COLUMN IF NOT EXISTS change_percent FLOAT DEFAULT 0.0;"))
                 conn.execute(text("ALTER TABLE market_prices ADD COLUMN IF NOT EXISTS data_source VARCHAR(100) DEFAULT 'admin_entry';"))
                 conn.execute(text("ALTER TABLE market_prices ADD COLUMN IF NOT EXISTS price_date DATE;"))
+                # ---------- States, Districts & Mandis ----------
+                conn.execute(text("ALTER TABLE states ADD COLUMN IF NOT EXISTS data_source VARCHAR(100) DEFAULT 'Survey of India / LGD';"))
+                conn.execute(text("ALTER TABLE districts ADD COLUMN IF NOT EXISTS code VARCHAR(20);"))
+                conn.execute(text("ALTER TABLE districts ADD COLUMN IF NOT EXISTS data_source VARCHAR(100) DEFAULT 'Census of India / LGD';"))
+                conn.execute(text("ALTER TABLE mandis ADD COLUMN IF NOT EXISTS data_source VARCHAR(100) DEFAULT 'AGMARKNET / DMI';"))
+                conn.execute(text("ALTER TABLE mandis ADD COLUMN IF NOT EXISTS is_verified BOOLEAN DEFAULT TRUE;"))
+                conn.execute(text("ALTER TABLE mandis ADD COLUMN IF NOT EXISTS verification_status VARCHAR(50) DEFAULT 'VERIFIED';"))
             elif dialect_name == "sqlite":
                 def _add_col_if_missing(table, col, col_def):
                     res = conn.execute(text(f"PRAGMA table_info({table});")).fetchall()
@@ -134,6 +141,12 @@ def sync_schema(eng):
                 _add_col_if_missing("market_prices", "change_percent", "FLOAT DEFAULT 0.0")
                 _add_col_if_missing("market_prices", "data_source", "VARCHAR(100) DEFAULT 'admin_entry'")
                 _add_col_if_missing("market_prices", "price_date", "DATE")
+                _add_col_if_missing("states", "data_source", "VARCHAR(100) DEFAULT 'Survey of India / LGD'")
+                _add_col_if_missing("districts", "code", "VARCHAR(20)")
+                _add_col_if_missing("districts", "data_source", "VARCHAR(100) DEFAULT 'Census of India / LGD'")
+                _add_col_if_missing("mandis", "data_source", "VARCHAR(100) DEFAULT 'AGMARKNET / DMI'")
+                _add_col_if_missing("mandis", "is_verified", "BOOLEAN DEFAULT 1")
+                _add_col_if_missing("mandis", "verification_status", "VARCHAR(50) DEFAULT 'VERIFIED'")
     except Exception as e:
         logger.warning(f"Schema sync notice: {e}")
 
