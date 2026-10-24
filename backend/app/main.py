@@ -66,6 +66,7 @@ from app.routes.orders import router as orders_router
 from app.routes.notifications import router as notif_router
 from app.routes.public import router as public_router
 from app.routes.admin import router as admin_router
+from app.routes.reviews import router as reviews_router
 
 # Mount all API routers
 app.include_router(auth_router, prefix=settings.API_V1_STR)
@@ -86,6 +87,7 @@ app.include_router(orders_router, prefix=settings.API_V1_STR)
 app.include_router(notif_router, prefix=settings.API_V1_STR)
 app.include_router(public_router, prefix=settings.API_V1_STR)
 app.include_router(admin_router, prefix=settings.API_V1_STR)
+app.include_router(reviews_router, prefix=settings.API_V1_STR)
 
 from app.core.database import get_db_status
 

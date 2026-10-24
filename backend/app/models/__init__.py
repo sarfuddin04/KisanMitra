@@ -12,7 +12,7 @@ from app.models.agronomy import (
 from app.models.market import (
     State, District, Mandi, MandiCrop, MandiImage, Market,
     MarketPrice, MarketPriceHistory, PriceSyncLog,
-    WeatherRecord
+    WeatherRecord, MandiReview
 )
 from app.models.marketplace import (
     ProductCategory,
@@ -42,7 +42,7 @@ __all__ = [
     "CropRecommendation", "DiseasePrediction", "FertilizerRecommendation",
     "State", "District", "Mandi", "MandiCrop", "MandiImage", "Market",
     "MarketPrice", "MarketPriceHistory", "PriceSyncLog",
-    "WeatherRecord",
+    "WeatherRecord", "MandiReview",
     "ProductCategory", "Product", "ProductImage",
     "Cart", "CartItem", "Order", "OrderItem", "Payment",
     "FarmingTip", "Notification", "Banner", "FAQ",

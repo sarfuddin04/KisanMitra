@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import {
   MapPin, Plus, Edit2, Trash2, ToggleLeft, ToggleRight,
   ChevronDown, Building2, Globe, Map, Search, X, Check,
-  Clock, Phone, Tag, Navigation
+  Clock, Phone, Tag, Navigation, Star, MessageSquare, ThumbsUp, ThumbsDown, AlertTriangle
 } from 'lucide-react';
 import api from '../../services/api';
 import { ImageUpload } from '../../components/ImageUpload';
@@ -585,6 +585,104 @@ const MandisTab = () => {
   );
 };
 
+// ==================== REVIEWS MODERATION TAB ====================
+
+const ReviewsModerationTab = () => {
+  const [reviews, setReviews] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [filter, setFilter] = useState('all'); // all | flagged
+
+  const loadReviews = async () => {
+    setLoading(true);
+    try {
+      const res = await api.get('/mandis/admin/reviews/pending');
+      setReviews(res.data || []);
+    } catch (err) {
+      console.error('Failed to load reviews:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { loadReviews(); }, []);
+
+  const handleModerate = async (reviewId, approved) => {
+    try {
+      await api.put(`/mandis/admin/reviews/${reviewId}/moderate`, {
+        is_approved: approved,
+        moderation_note: approved ? 'Approved by admin' : 'Rejected by admin',
+      });
+      loadReviews();
+    } catch (err) {
+      console.error('Moderation failed:', err);
+    }
+  };
+
+  return (
+    <div className="space-y-4 mt-6">
+      <div className="flex items-center justify-between">
+        <h3 className="text-sm font-black text-gray-900 flex items-center gap-2">
+          <Star className="w-4 h-4 text-amber-500" />
+          Mandi Reviews Moderation
+        </h3>
+        <button onClick={loadReviews} className="text-xs text-emerald-600 font-bold hover:underline">
+          Refresh
+        </button>
+      </div>
+
+      {loading ? (
+        <div className="py-12 text-center text-xs text-gray-400 font-medium">Loading reviews...</div>
+      ) : reviews.length === 0 ? (
+        <div className="py-12 text-center">
+          <MessageSquare className="w-10 h-10 text-gray-300 mx-auto mb-3" />
+          <p className="text-xs text-gray-500 font-bold">No flagged reviews</p>
+          <p className="text-[10px] text-gray-400 mt-1">All reviews are clean</p>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {reviews.map((r) => (
+            <div key={r.id} className="bg-white rounded-2xl border border-amber-200 p-4 shadow-sm">
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="text-xs font-black text-gray-900">{r.user_name}</span>
+                    <span className="text-[10px] text-gray-400">{r.mandi_name}</span>
+                    <div className="flex items-center gap-0.5">
+                      {[1,2,3,4,5].map(s => (
+                        <Star key={s} className={`w-3 h-3 ${s <= r.rating ? 'fill-amber-400 text-amber-400' : 'text-gray-200'}`} />
+                      ))}
+                    </div>
+                  </div>
+                  {r.comment && (
+                    <p className="text-xs text-gray-600 leading-relaxed">{r.comment}</p>
+                  )}
+                  <p className="text-[10px] text-gray-400 mt-1">
+                    {r.created_at ? new Date(r.created_at).toLocaleDateString('en-IN') : ''}
+                  </p>
+                </div>
+                <div className="flex gap-2 flex-shrink-0">
+                  <button
+                    onClick={() => handleModerate(r.id, true)}
+                    className="flex items-center gap-1 px-3 py-1.5 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 text-[10px] font-bold rounded-xl border border-emerald-200 transition-all"
+                  >
+                    <ThumbsUp className="w-3 h-3" /> Approve
+                  </button>
+                  <button
+                    onClick={() => handleModerate(r.id, false)}
+                    className="flex items-center gap-1 px-3 py-1.5 bg-red-50 text-red-600 hover:bg-red-100 text-[10px] font-bold rounded-xl border border-red-200 transition-all"
+                  >
+                    <ThumbsDown className="w-3 h-3" /> Reject
+                  </button>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
 
 // ==================== MAIN PAGE ====================
 
@@ -592,6 +690,7 @@ const TABS = [
   { key: 'states', label: 'States', icon: Globe },
   { key: 'districts', label: 'Districts', icon: Map },
   { key: 'mandis', label: 'Mandis', icon: Building2 },
+  { key: 'reviews', label: 'Reviews', icon: Star },
 ];
 
 export const AdminLocations = () => {
@@ -644,6 +743,7 @@ export const AdminLocations = () => {
       {activeTab === 'states' && <StatesTab />}
       {activeTab === 'districts' && <DistrictsTab />}
       {activeTab === 'mandis' && <MandisTab />}
+      {activeTab === 'reviews' && <ReviewsModerationTab />}
     </div>
   );
 };

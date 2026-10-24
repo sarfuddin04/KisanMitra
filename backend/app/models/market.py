@@ -226,3 +226,31 @@ class WeatherRecord(Base):
     forecast_data = Column(Text, nullable=True)  # JSON
     advisory = Column(Text, nullable=True)
     recorded_at = Column(DateTime, default=datetime.datetime.utcnow)
+
+
+# ==================== MANDI REVIEWS ====================
+
+class MandiReview(Base):
+    """Farmer ratings and reviews for mandis — genuine user-submitted content only."""
+    __tablename__ = "mandi_reviews"
+
+    id = Column(Integer, primary_key=True, index=True)
+    mandi_id = Column(Integer, ForeignKey("mandis.id", ondelete="CASCADE"), nullable=False, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    rating = Column(Integer, nullable=False)       # 1-5 stars
+    comment = Column(Text, nullable=True)
+    is_approved = Column(Boolean, default=True)     # Admin moderation flag
+    is_flagged = Column(Boolean, default=False)     # Flagged for review
+    moderation_note = Column(Text, nullable=True)   # Admin notes
+    moderated_by = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    moderated_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
+
+    mandi = relationship("Mandi", backref="reviews")
+    user = relationship("User", foreign_keys=[user_id], backref="mandi_reviews")
+    moderator = relationship("User", foreign_keys=[moderated_by])
+
+    __table_args__ = (
+        UniqueConstraint("mandi_id", "user_id", name="uq_mandi_user_review"),
+    )

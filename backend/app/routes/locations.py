@@ -292,11 +292,31 @@ def get_mandis_for_map(
 
     mandis = query.limit(limit).all()
 
+    # Batch-load rating counts for efficiency
+    from app.models.market import MandiReview
+    mandi_ids = [m.id for m in mandis]
+    rating_data = {}
+    if mandi_ids:
+        rating_rows = db.query(
+            MandiReview.mandi_id,
+            func.avg(MandiReview.rating).label("avg_rating"),
+            func.count(MandiReview.id).label("review_count"),
+        ).filter(
+            MandiReview.mandi_id.in_(mandi_ids),
+            MandiReview.is_approved == True,
+        ).group_by(MandiReview.mandi_id).all()
+        for row in rating_rows:
+            rating_data[row.mandi_id] = {
+                "average_rating": round(float(row.avg_rating), 1),
+                "review_count": row.review_count,
+            }
+
     results = []
     for m in mandis:
         district = m.district
         state = district.state if district else None
         crop_names = [mc.crop.name for mc in (m.mandi_crops or []) if mc.crop]
+        rd = rating_data.get(m.id, {"average_rating": 0, "review_count": 0})
 
         results.append({
             "id": m.id,
@@ -314,6 +334,8 @@ def get_mandis_for_map(
             "address": m.address,
             "contact_number": m.contact_number,
             "pincode": m.pincode,
+            "average_rating": rd["average_rating"],
+            "review_count": rd["review_count"],
         })
 
     return results
@@ -333,7 +355,7 @@ def get_mandi(mandi_id: int, db: Session = Depends(get_db)):
 
 @router.get("/mandis/{mandi_id}/detail")
 def get_mandi_detail(mandi_id: int, db: Session = Depends(get_db)):
-    """Get full mandi detail with crops and latest prices."""
+    """Get full mandi detail with crops, latest prices, and rating stats."""
     from sqlalchemy import desc
 
     m = db.query(Mandi).options(
@@ -371,8 +393,25 @@ def get_mandi_detail(mandi_id: int, db: Session = Depends(get_db)):
             "price_date": str(p.price_date) if p.price_date else None,
             "data_source": p.data_source,
             "trend": p.trend,
+            "change_percent": p.change_percent,
             "fetched_at": str(p.fetched_at) if p.fetched_at else None,
         })
+
+    # Rating stats from genuine reviews
+    from app.models.market import MandiReview
+    approved_reviews = db.query(MandiReview).filter(
+        MandiReview.mandi_id == mandi_id,
+        MandiReview.is_approved == True,
+    ).all()
+
+    rating_stats = {"average_rating": 0, "total_reviews": 0, "distribution": {1: 0, 2: 0, 3: 0, 4: 0, 5: 0}}
+    if approved_reviews:
+        total = len(approved_reviews)
+        avg = sum(r.rating for r in approved_reviews) / total
+        dist = {1: 0, 2: 0, 3: 0, 4: 0, 5: 0}
+        for r in approved_reviews:
+            dist[r.rating] = dist.get(r.rating, 0) + 1
+        rating_stats = {"average_rating": round(avg, 1), "total_reviews": total, "distribution": dist}
 
     return {
         "id": m.id,
@@ -395,6 +434,7 @@ def get_mandi_detail(mandi_id: int, db: Session = Depends(get_db)):
         "updated_at": m.updated_at,
         "crops": crops,
         "latest_prices": price_list,
+        "rating_stats": rating_stats,
     }
 
 
