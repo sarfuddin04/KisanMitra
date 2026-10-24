@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { Sprout, Phone, Mail, MapPin, Heart, Shield, Cpu, Sparkles } from 'lucide-react';
+import { Sprout, Phone, Mail, MapPin, Heart, Shield, Cpu } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 
 export const Footer = () => {
@@ -24,10 +24,6 @@ export const Footer = () => {
             <p className="text-sm text-slate-400 leading-relaxed max-w-sm">
               Empowering India's agricultural ecosystem with artificial intelligence, soil science, pathology detection, live mandi trading, and precision meteorological advisories.
             </p>
-            <div className="pt-2 flex items-center space-x-3 text-xs text-emerald-400 font-semibold bg-emerald-950/60 border border-emerald-800/50 px-3.5 py-2 rounded-xl w-fit">
-              <Sparkles className="w-4 h-4" />
-              <span>National B.Tech CSE Major Project Innovation</span>
-            </div>
           </div>
 
           {/* Quick Links */}
