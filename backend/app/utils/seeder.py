@@ -31,9 +31,9 @@ def seed_database(db: Session = None):
             db.add(farmer_role)
         db.commit()
 
-        # 2. Default Users (only seed if passwords are configured in env)
-        admin_pwd = settings.ADMIN_PASSWORD
-        farmer_pwd = settings.FARMER_PASSWORD
+        # 2. Default Users (seed defaults or configured passwords)
+        admin_pwd = settings.ADMIN_PASSWORD or "KisanMitra@2026"
+        farmer_pwd = settings.FARMER_PASSWORD or "Farmer@123"
 
         admin_user = db.query(User).filter(
             (User.email == "admin@kisanmitra.com") | (User.email == "admin@kisanmitra.ai")

@@ -149,7 +149,13 @@ def register_user(req: UserRegister, db: Session = Depends(get_db)):
 
 @router.post("/login", response_model=Token)
 def login_user(req: UserLogin, db: Session = Depends(get_db)):
-    user = db.query(User).filter(User.email == req.email.lower().strip()).first()
+    clean_email = req.email.lower().strip()
+    user = db.query(User).filter(User.email == clean_email).first()
+    if not user:
+        if clean_email == "admin@kisanmitra.ai":
+            user = db.query(User).filter(User.email == "admin@kisanmitra.com").first()
+        elif clean_email == "admin@kisanmitra.com":
+            user = db.query(User).filter(User.email == "admin@kisanmitra.ai").first()
     if not user or not verify_password(req.password, user.password_hash):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
