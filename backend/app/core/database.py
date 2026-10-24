@@ -83,6 +83,7 @@ def sync_schema(eng):
                 conn.execute(text("ALTER TABLE products ADD COLUMN IF NOT EXISTS mandi_name VARCHAR(150);"))
                 conn.execute(text("ALTER TABLE products ADD COLUMN IF NOT EXISTS is_available BOOLEAN DEFAULT TRUE;"))
                 conn.execute(text("ALTER TABLE products ADD COLUMN IF NOT EXISTS rating FLOAT DEFAULT 4.8;"))
+                conn.execute(text("ALTER TABLE products ADD COLUMN IF NOT EXISTS status VARCHAR(50) DEFAULT 'ACTIVE';"))
                 # ---------- Product Categories ----------
                 conn.execute(text("ALTER TABLE product_categories ADD COLUMN IF NOT EXISTS icon_name VARCHAR(50) DEFAULT 'Sprout';"))
                 # ---------- Market Prices ----------
@@ -90,6 +91,12 @@ def sync_schema(eng):
                 conn.execute(text("ALTER TABLE market_prices ADD COLUMN IF NOT EXISTS crop_id INTEGER;"))
                 conn.execute(text("ALTER TABLE market_prices ADD COLUMN IF NOT EXISTS district VARCHAR(100);"))
                 conn.execute(text("ALTER TABLE market_prices ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT TRUE;"))
+                conn.execute(text("ALTER TABLE market_prices ADD COLUMN IF NOT EXISTS fetched_at TIMESTAMP;"))
+                conn.execute(text("ALTER TABLE market_prices ADD COLUMN IF NOT EXISTS source_record_id VARCHAR(100);"))
+                conn.execute(text("ALTER TABLE market_prices ADD COLUMN IF NOT EXISTS trend VARCHAR(20) DEFAULT 'STABLE';"))
+                conn.execute(text("ALTER TABLE market_prices ADD COLUMN IF NOT EXISTS change_percent FLOAT DEFAULT 0.0;"))
+                conn.execute(text("ALTER TABLE market_prices ADD COLUMN IF NOT EXISTS data_source VARCHAR(100) DEFAULT 'admin_entry';"))
+                conn.execute(text("ALTER TABLE market_prices ADD COLUMN IF NOT EXISTS price_date DATE;"))
             elif dialect_name == "sqlite":
                 def _add_col_if_missing(table, col, col_def):
                     res = conn.execute(text(f"PRAGMA table_info({table});")).fetchall()
@@ -115,11 +122,18 @@ def sync_schema(eng):
                 _add_col_if_missing("products", "mandi_name", "VARCHAR(150)")
                 _add_col_if_missing("products", "is_available", "BOOLEAN DEFAULT 1")
                 _add_col_if_missing("products", "rating", "FLOAT DEFAULT 4.8")
+                _add_col_if_missing("products", "status", "VARCHAR(50) DEFAULT 'ACTIVE'")
                 _add_col_if_missing("product_categories", "icon_name", "VARCHAR(50) DEFAULT 'Sprout'")
                 _add_col_if_missing("market_prices", "mandi_id", "INTEGER")
                 _add_col_if_missing("market_prices", "crop_id", "INTEGER")
                 _add_col_if_missing("market_prices", "district", "VARCHAR(100)")
                 _add_col_if_missing("market_prices", "is_active", "BOOLEAN DEFAULT 1")
+                _add_col_if_missing("market_prices", "fetched_at", "TIMESTAMP")
+                _add_col_if_missing("market_prices", "source_record_id", "VARCHAR(100)")
+                _add_col_if_missing("market_prices", "trend", "VARCHAR(20) DEFAULT 'STABLE'")
+                _add_col_if_missing("market_prices", "change_percent", "FLOAT DEFAULT 0.0")
+                _add_col_if_missing("market_prices", "data_source", "VARCHAR(100) DEFAULT 'admin_entry'")
+                _add_col_if_missing("market_prices", "price_date", "DATE")
     except Exception as e:
         logger.warning(f"Schema sync notice: {e}")
 

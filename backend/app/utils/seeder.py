@@ -65,11 +65,13 @@ def seed_database(db: Session = None):
             )
             db.add(admin_profile)
         elif admin_user and admin_pwd:
-            # Always ensure admin credentials are correct on every startup
+            # Always ensure admin credentials and role are correct on every startup
             admin_user.email = "admin@kisanmitra.com"
+            admin_user.role_id = admin_role.id
             admin_user.password_hash = hash_password(admin_pwd)
             admin_user.is_active = True
             admin_user.is_verified = True
+            db.commit()
 
         farmer_user = db.query(User).filter(User.email == "farmer@kisanmitra.ai").first()
         if not farmer_user and farmer_pwd:
@@ -98,6 +100,11 @@ def seed_database(db: Session = None):
                 bio="Progressive farmer practicing organic crop rotation and precision irrigation."
             )
             db.add(farmer_profile)
+            db.commit()
+        elif farmer_user and farmer_pwd:
+            farmer_user.password_hash = hash_password(farmer_pwd)
+            farmer_user.is_active = True
+            farmer_user.is_verified = True
             db.commit()
 
         # 3. Crops (10 essential agricultural crops with images)
