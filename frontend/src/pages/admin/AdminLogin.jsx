@@ -64,28 +64,6 @@ export const AdminLogin = () => {
           </div>
         )}
 
-        {/* Admin Credentials Helper */}
-        <div className="p-3 bg-purple-950/40 border border-purple-800/60 rounded-xl text-xs space-y-1.5 text-purple-200">
-          <div className="flex items-center justify-between">
-            <span className="font-semibold text-purple-300">Default Admin Credentials</span>
-            <button
-              type="button"
-              onClick={() => {
-                setEmail('admin@kisanmitra.com');
-                setPassword('KisanMitra@2026');
-              }}
-              className="px-2 py-1 bg-purple-600 hover:bg-purple-500 text-white rounded-lg text-xs font-semibold transition cursor-pointer"
-            >
-              Auto-fill
-            </button>
-          </div>
-          <p className="text-xs text-purple-300/90 font-mono">
-            Email: <strong className="text-white">admin@kisanmitra.com</strong>
-            <br />
-            Password: <strong className="text-white">KisanMitra@2026</strong>
-          </p>
-        </div>
-
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-xs font-bold text-slate-300 mb-1">Admin Email</label>
