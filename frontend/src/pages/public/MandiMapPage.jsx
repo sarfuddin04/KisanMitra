@@ -113,27 +113,32 @@ const MandiMapPage = () => {
   const [mapCenter, setMapCenter] = useState(INDIA_CENTER);
   const [mapZoom, setMapZoom] = useState(5);
   const [showFilters, setShowFilters] = useState(false);
-  const [filterState, setFilterState] = useState('');
-  const [filterType, setFilterType] = useState('');
   const [states, setStates] = useState([]);
   const [myReview, setMyReview] = useState(null);
   const [reviewForm, setReviewForm] = useState({ rating: 5, comment: '' });
   const [submittingReview, setSubmittingReview] = useState(false);
   const [showDetailPanel, setShowDetailPanel] = useState(false);
 
+  // Cascading filters
+  const [filterStateName, setFilterStateName] = useState('');
+  const [filterDistrictId, setFilterDistrictId] = useState('');
+  const [filterDistrictName, setFilterDistrictName] = useState('');
+  const [filterType, setFilterType] = useState('');
+  const [districts, setDistricts] = useState([]);
+  const [districtsLoading, setDistrictsLoading] = useState(false);
+
   // ── Load mandis from API ────────────────────────────────────────────
   const loadMandis = useCallback(async () => {
     setLoading(true);
     try {
-      const params = {};
-      if (userLat && userLon && granted) {
-        params.lat = userLat;
-        params.lon = userLon;
+      const params = { limit: 500 };
+      if (searchQuery.trim()) params.q = searchQuery.trim();
+      if (filterDistrictId) {
+        params.district_id = filterDistrictId;
+      } else if (filterStateName) {
+        params.state_name = filterStateName;
       }
-      if (searchQuery.trim()) params.search = searchQuery.trim();
-      if (filterState) params.state = filterState;
-      if (filterType) params.type = filterType;
-      params.limit = 500;
+      if (filterType) params.mandi_type = filterType;
 
       const res = await api.get('/mandis/map', { params });
       setMandis(res.data || []);
@@ -142,7 +147,7 @@ const MandiMapPage = () => {
     } finally {
       setLoading(false);
     }
-  }, [userLat, userLon, granted, searchQuery, filterState, filterType]);
+  }, [searchQuery, filterStateName, filterDistrictId, filterType]);
 
   useEffect(() => { loadMandis(); }, [loadMandis]);
 
@@ -150,6 +155,38 @@ const MandiMapPage = () => {
   useEffect(() => {
     api.get('/states').then(r => setStates(r.data || [])).catch(() => {});
   }, []);
+
+  // Load districts when state changes
+  useEffect(() => {
+    setFilterDistrictId('');
+    setFilterDistrictName('');
+    setDistricts([]);
+    if (!filterStateName) return;
+    const selectedState = states.find(s => s.name === filterStateName);
+    if (!selectedState) return;
+    setDistrictsLoading(true);
+    api.get(`/states/${selectedState.id}/districts`)
+      .then(r => setDistricts(r.data || []))
+      .catch(() => {})
+      .finally(() => setDistrictsLoading(false));
+  }, [filterStateName, states]);
+
+  // When state changes on map — fly to state center
+  useEffect(() => {
+    if (!filterStateName) {
+      setMapCenter(INDIA_CENTER);
+      setMapZoom(5);
+    } else if (filterStateName && mandis.length > 0) {
+      // Center map on first mandi with coords in filtered list
+      const withCoords = mandis.filter(m => m.latitude && m.longitude);
+      if (withCoords.length > 0) {
+        const avgLat = withCoords.reduce((s, m) => s + m.latitude, 0) / withCoords.length;
+        const avgLon = withCoords.reduce((s, m) => s + m.longitude, 0) / withCoords.length;
+        setMapCenter([avgLat, avgLon]);
+        setMapZoom(7);
+      }
+    }
+  }, [filterStateName, mandis]);
 
   // ── Search debounce ─────────────────────────────────────────────────
   const searchTimeout = useRef(null);
@@ -361,36 +398,91 @@ const MandiMapPage = () => {
 
           {/* Filter Panel */}
           {showFilters && (
-            <div className="mt-3 pt-3 border-t border-gray-100 flex flex-wrap gap-3">
-              <select
-                value={filterState}
-                onChange={(e) => { setFilterState(e.target.value); setTimeout(loadMandis, 100); }}
-                className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-gray-700 focus:outline-none focus:ring-2 focus:ring-emerald-500/30"
-              >
-                <option value="">All States</option>
-                {states.map(s => <option key={s.id} value={s.name}>{s.name}</option>)}
-              </select>
-              <select
-                value={filterType}
-                onChange={(e) => { setFilterType(e.target.value); setTimeout(loadMandis, 100); }}
-                className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-gray-700 focus:outline-none focus:ring-2 focus:ring-emerald-500/30"
-              >
-                <option value="">All Types</option>
-                <option value="APMC Mandi">APMC Mandi</option>
-                <option value="Private Mandi">Private Mandi</option>
-                <option value="Wholesale Market">Wholesale Market</option>
-              </select>
-              {(filterState || filterType) && (
-                <button
-                  onClick={() => { setFilterState(''); setFilterType(''); setTimeout(loadMandis, 100); }}
-                  className="flex items-center gap-1 px-3 py-2 text-red-600 bg-red-50 hover:bg-red-100 rounded-xl text-xs font-bold border border-red-200 transition-all"
-                >
-                  <X className="w-3 h-3" /> Clear
-                </button>
-              )}
-              <div className="ml-auto flex items-center text-xs text-gray-400 font-semibold">
-                {mandis.length} mandis found
+            <div className="mt-3 pt-3 border-t border-gray-100">
+              <div className="flex flex-wrap gap-3 items-end">
+                {/* State Filter */}
+                <div className="flex flex-col gap-1">
+                  <label className="text-[9px] uppercase font-bold text-gray-400 px-1">State / UT</label>
+                  <select
+                    value={filterStateName}
+                    onChange={(e) => {
+                      setFilterStateName(e.target.value);
+                    }}
+                    className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-gray-700 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 min-w-[160px]"
+                  >
+                    <option value="">🇮🇳 All India</option>
+                    {states.map(s => <option key={s.id} value={s.name}>{s.name}</option>)}
+                  </select>
+                </div>
+
+                {/* District Filter (cascades from state) */}
+                {filterStateName && (
+                  <div className="flex flex-col gap-1">
+                    <label className="text-[9px] uppercase font-bold text-gray-400 px-1">
+                      District {districtsLoading && '...'}
+                    </label>
+                    <select
+                      value={filterDistrictId}
+                      onChange={(e) => {
+                        setFilterDistrictId(e.target.value);
+                        const found = districts.find(d => String(d.id) === e.target.value);
+                        setFilterDistrictName(found?.name || '');
+                      }}
+                      disabled={districtsLoading || districts.length === 0}
+                      className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-gray-700 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 min-w-[150px] disabled:opacity-50"
+                    >
+                      <option value="">All Districts</option>
+                      {districts.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+                    </select>
+                  </div>
+                )}
+
+                {/* Mandi Type Filter */}
+                <div className="flex flex-col gap-1">
+                  <label className="text-[9px] uppercase font-bold text-gray-400 px-1">Mandi Type</label>
+                  <select
+                    value={filterType}
+                    onChange={(e) => setFilterType(e.target.value)}
+                    className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-gray-700 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 min-w-[160px]"
+                  >
+                    <option value="">All Types</option>
+                    <option value="APMC Mandi">🏛️ APMC Mandi</option>
+                    <option value="Government Mandi">🏢 Government Mandi</option>
+                    <option value="Private Wholesale Market">🏪 Private Wholesale</option>
+                    <option value="Wholesale">📦 Wholesale Market</option>
+                    <option value="Rural Haat">🛖 Rural Haat</option>
+                  </select>
+                </div>
+
+                {/* Clear Filters */}
+                {(filterStateName || filterType) && (
+                  <button
+                    onClick={() => {
+                      setFilterStateName('');
+                      setFilterDistrictId('');
+                      setFilterDistrictName('');
+                      setFilterType('');
+                    }}
+                    className="flex items-center gap-1 px-3 py-2 text-red-600 bg-red-50 hover:bg-red-100 rounded-xl text-xs font-bold border border-red-200 transition-all self-end"
+                  >
+                    <X className="w-3 h-3" /> Clear All
+                  </button>
+                )}
+
+                <div className="ml-auto flex items-center text-xs text-gray-400 font-semibold self-end pb-2">
+                  <span className="text-emerald-600 font-bold">{mandis.length}</span>&nbsp;mandis found
+                </div>
               </div>
+
+              {/* Active filter breadcrumb */}
+              {(filterStateName || filterDistrictName) && (
+                <div className="flex items-center gap-1 mt-2 text-[10px] text-emerald-700 font-bold">
+                  <MapPin className="w-3 h-3" />
+                  <span>Showing:</span>
+                  {filterStateName && <span className="bg-emerald-50 px-2 py-0.5 rounded-lg border border-emerald-200">{filterStateName}</span>}
+                  {filterDistrictName && <><ChevronRight className="w-3 h-3" /><span className="bg-emerald-50 px-2 py-0.5 rounded-lg border border-emerald-200">{filterDistrictName}</span></>}
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -402,10 +494,30 @@ const MandiMapPage = () => {
 
           {/* ── LEFT PANEL: Mandi Cards ──────────────────────────────── */}
           <div className={`${viewMode === 'map' && showDetailPanel && selectedMandi ? 'hidden lg:flex' : 'flex'} flex-col w-full sm:w-80 lg:w-96 flex-shrink-0 bg-white border-r border-gray-200 overflow-y-auto`}>
-            <div className="p-3 border-b border-gray-100 bg-gray-50/50">
-              <p className="text-xs font-bold text-gray-500">
-                {granted ? 'Nearby Mandis' : 'All Mandis'} • <span className="text-emerald-600">{sortedMandis.length}</span>
+            <div className="p-3 border-b border-gray-100 bg-gray-50/50 flex items-center justify-between">
+              <p className="text-xs font-bold text-gray-600 truncate">
+                {filterStateName ? (
+                  <span>Mandis in <span className="text-emerald-700 font-extrabold">{filterStateName}</span></span>
+                ) : granted ? (
+                  <span>Nearby Mandis</span>
+                ) : (
+                  <span>All India Mandis</span>
+                )} • <span className="text-emerald-600 font-extrabold">{sortedMandis.length}</span>
               </p>
+              {(filterStateName || filterType || searchQuery) && (
+                <button
+                  onClick={() => {
+                    setFilterStateName('');
+                    setFilterDistrictId('');
+                    setFilterDistrictName('');
+                    setFilterType('');
+                    setSearchQuery('');
+                  }}
+                  className="text-[10px] text-gray-400 hover:text-emerald-600 font-semibold underline flex-shrink-0 ml-2"
+                >
+                  Clear
+                </button>
+              )}
             </div>
 
             {loading ? (

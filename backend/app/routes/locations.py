@@ -204,8 +204,11 @@ def get_nearby_mandis(
 def search_mandis(
     q: str = Query("", description="Search query"),
     state_id: Optional[int] = Query(None),
+    state_name: Optional[str] = Query(None, description="Filter by state name (case-insensitive)"),
     district_id: Optional[int] = Query(None),
+    district_name: Optional[str] = Query(None, description="Filter by district name"),
     crop_id: Optional[int] = Query(None),
+    mandi_type: Optional[str] = Query(None, description="Filter by mandi type"),
     limit: int = Query(100, ge=1, le=500),
     db: Session = Depends(get_db),
 ):
@@ -213,27 +216,39 @@ def search_mandis(
     query = db.query(Mandi).options(
         joinedload(Mandi.district).joinedload(District.state),
         joinedload(Mandi.mandi_crops).joinedload(MandiCrop.crop),
+    ).join(District, Mandi.district_id == District.id, isouter=True
+    ).join(State, District.state_id == State.id, isouter=True
     ).filter(Mandi.is_active == True)
 
-    if district_id:
+    if district_id and isinstance(district_id, int):
         query = query.filter(Mandi.district_id == district_id)
-    elif state_id:
-        query = query.join(District).filter(District.state_id == state_id)
+    elif district_name and isinstance(district_name, str) and district_name.strip():
+        query = query.filter(District.name.ilike(f"%{district_name.strip()}%"))
+    elif state_id and isinstance(state_id, int):
+        query = query.filter(District.state_id == state_id)
+    elif state_name and isinstance(state_name, str) and state_name.strip():
+        query = query.filter(State.name.ilike(f"%{state_name.strip()}%"))
 
-    if crop_id:
+    if mandi_type and isinstance(mandi_type, str) and mandi_type.strip():
+        query = query.filter(Mandi.mandi_type.ilike(f"%{mandi_type.strip()}%"))
+
+    if crop_id and isinstance(crop_id, int):
         query = query.join(MandiCrop, Mandi.id == MandiCrop.mandi_id).filter(MandiCrop.crop_id == crop_id)
 
-    if q and q.strip():
+    if q and isinstance(q, str) and q.strip():
         search_term = f"%{q.strip()}%"
         query = query.filter(
             or_(
                 Mandi.name.ilike(search_term),
                 Mandi.address.ilike(search_term),
                 Mandi.pincode.ilike(search_term),
+                District.name.ilike(search_term),
+                State.name.ilike(search_term),
             )
         )
 
-    mandis = query.order_by(Mandi.name.asc()).limit(limit).all()
+    actual_limit = limit if isinstance(limit, int) else 100
+    mandis = query.order_by(Mandi.name.asc()).limit(actual_limit).all()
 
     results = []
     for m in mandis:
@@ -251,38 +266,51 @@ def search_mandis(
 @router.get("/mandis/map")
 def get_mandis_for_map(
     state_id: Optional[int] = Query(None),
+    state_name: Optional[str] = Query(None, description="Filter by state name (case-insensitive)"),
     district_id: Optional[int] = Query(None),
+    district_name: Optional[str] = Query(None, description="Filter by district name"),
+    mandi_type: Optional[str] = Query(None, description="Filter by mandi type"),
     crop_id: Optional[int] = Query(None),
     bounds_ne_lat: Optional[float] = Query(None),
     bounds_ne_lng: Optional[float] = Query(None),
     bounds_sw_lat: Optional[float] = Query(None),
     bounds_sw_lng: Optional[float] = Query(None),
+    active_only: bool = Query(True),
     limit: int = Query(500, ge=1, le=1000),
     db: Session = Depends(get_db),
 ):
     """
     Lightweight mandi data for map markers.
-    Supports map-bounds filtering for efficient loading.
+    Supports map-bounds filtering, state/district name filtering, and mandi_type filtering.
     """
     query = db.query(Mandi).options(
         joinedload(Mandi.district).joinedload(District.state),
         joinedload(Mandi.mandi_crops).joinedload(MandiCrop.crop),
-    ).filter(
-        Mandi.is_active == True,
-        Mandi.latitude.isnot(None),
-        Mandi.longitude.isnot(None),
-    )
+    ).join(District, Mandi.district_id == District.id, isouter=True
+    ).join(State, District.state_id == State.id, isouter=True)
 
-    if district_id:
+    if active_only:
+        query = query.filter(Mandi.is_active == True)
+
+    # Location filters (cascading: district > state)
+    if district_id and isinstance(district_id, int):
         query = query.filter(Mandi.district_id == district_id)
-    elif state_id:
-        query = query.join(District).filter(District.state_id == state_id)
+    elif district_name and isinstance(district_name, str) and district_name.strip():
+        query = query.filter(District.name.ilike(f"%{district_name.strip()}%"))
+    elif state_id and isinstance(state_id, int):
+        query = query.filter(District.state_id == state_id)
+    elif state_name and isinstance(state_name, str) and state_name.strip():
+        query = query.filter(State.name.ilike(f"%{state_name.strip()}%"))
 
-    if crop_id:
+    # Mandi type filter
+    if mandi_type and isinstance(mandi_type, str) and mandi_type.strip():
+        query = query.filter(Mandi.mandi_type.ilike(f"%{mandi_type.strip()}%"))
+
+    if crop_id and isinstance(crop_id, int):
         query = query.join(MandiCrop, Mandi.id == MandiCrop.mandi_id).filter(MandiCrop.crop_id == crop_id)
 
     # Bounds-based filtering
-    if all(v is not None for v in [bounds_ne_lat, bounds_ne_lng, bounds_sw_lat, bounds_sw_lng]):
+    if all(isinstance(v, (int, float)) for v in [bounds_ne_lat, bounds_ne_lng, bounds_sw_lat, bounds_sw_lng]):
         query = query.filter(
             Mandi.latitude >= bounds_sw_lat,
             Mandi.latitude <= bounds_ne_lat,
@@ -290,7 +318,8 @@ def get_mandis_for_map(
             Mandi.longitude <= bounds_ne_lng,
         )
 
-    mandis = query.limit(limit).all()
+    actual_limit = limit if isinstance(limit, int) else 500
+    mandis = query.limit(actual_limit).all()
 
     # Batch-load rating counts for efficiency
     from app.models.market import MandiReview
@@ -325,6 +354,8 @@ def get_mandis_for_map(
             "longitude": m.longitude,
             "district_name": district.name if district else None,
             "state_name": state.name if state else None,
+            "state_id": state.id if state else None,
+            "district_id": district.id if district else None,
             "image_url": m.image_url,
             "mandi_type": m.mandi_type,
             "opening_time": m.opening_time,

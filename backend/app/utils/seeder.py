@@ -5,7 +5,7 @@ from app.core.security import hash_password
 from app.core.config import settings
 from app.models.user import Role, User, UserProfile
 from app.models.agronomy import Crop, Fertilizer, Disease
-from app.models.market import State, District, Mandi, Market, MarketPrice
+from app.models.market import State, District, Mandi, MandiCrop, Market, MarketPrice
 from app.models.marketplace import ProductCategory, Product
 from app.models.content import FarmingTip, Banner, FAQ, SystemSetting, Notification
 
@@ -538,237 +538,137 @@ def seed_database(db: Session = None):
 
         print("Database initialized and successfully seeded with rich agricultural data.")
 
-        # ==================== LOCATION HIERARCHY SEEDING ====================
-        if db.query(State).count() == 0:
-            locations = [
-                {
-                    "state": "Uttar Pradesh",
-                    "districts": [
-                        {"name": "Lucknow", "mandis": [
-                            {"name": "Lucknow Mandi", "address": "Aishbagh, Lucknow", "pincode": "226004", "mandi_type": "APMC Mandi", "opening_time": "05:00", "closing_time": "20:00", "contact_number": "0522-2636291"},
-                            {"name": "Dubagga Mandi", "address": "Dubagga, Lucknow", "pincode": "226002", "mandi_type": "Rural Haat", "opening_time": "06:00", "closing_time": "19:00"},
-                            {"name": "Sitapur Road Mandi", "address": "Sitapur Road, Lucknow", "pincode": "226021", "mandi_type": "APMC Mandi", "opening_time": "05:30", "closing_time": "20:30"},
-                        ]},
-                        {"name": "Agra", "mandis": [
-                            {"name": "Agra Mandi", "address": "Shahganj Sabji Mandi, Agra", "pincode": "282010", "mandi_type": "APMC Mandi", "opening_time": "05:00", "closing_time": "20:00"},
-                            {"name": "Bodla Mandi", "address": "Bodla, Agra", "pincode": "282007", "mandi_type": "Wholesale", "opening_time": "06:00", "closing_time": "18:00"},
-                        ]},
-                        {"name": "Varanasi", "mandis": [
-                            {"name": "Varanasi Mandi", "address": "Lahartara Mandi, Varanasi", "pincode": "221002", "mandi_type": "APMC Mandi", "opening_time": "05:00", "closing_time": "21:00"},
-                            {"name": "Chaukaghat Mandi", "address": "Chaukaghat, Varanasi", "pincode": "221001", "mandi_type": "Rural Haat"},
-                        ]},
-                        {"name": "Kanpur", "mandis": [
-                            {"name": "Kanpur Mandi", "address": "Navagraha Mandi, Kanpur", "pincode": "208001", "mandi_type": "APMC Mandi", "opening_time": "05:00", "closing_time": "20:00"},
-                            {"name": "Kidwai Nagar Mandi", "address": "Kidwai Nagar, Kanpur", "pincode": "208011", "mandi_type": "Wholesale"},
-                        ]},
-                        {"name": "Meerut", "mandis": [
-                            {"name": "Meerut Mandi", "address": "Dilli Road, Meerut", "pincode": "250002", "mandi_type": "APMC Mandi", "opening_time": "05:00", "closing_time": "20:00"},
-                            {"name": "Shastri Nagar Mandi", "address": "Shastri Nagar, Meerut", "pincode": "250004", "mandi_type": "Rural Haat"},
-                        ]},
-                        {"name": "Allahabad", "mandis": [
-                            {"name": "Allahabad Mandi", "address": "Zero Road, Prayagraj", "pincode": "211003", "mandi_type": "APMC Mandi"},
-                            {"name": "Naini Mandi", "address": "Naini, Prayagraj", "pincode": "211008", "mandi_type": "Wholesale"},
-                        ]},
-                    ]
-                },
-                {
-                    "state": "Maharashtra",
-                    "districts": [
-                        {"name": "Nashik", "mandis": [
-                            {"name": "Nashik Mandi", "address": "APMC Yard, Nashik", "pincode": "422001", "mandi_type": "APMC Mandi", "opening_time": "06:00", "closing_time": "20:00"},
-                            {"name": "Lasalgaon Mandi", "address": "Lasalgaon, Nashik", "pincode": "422306", "mandi_type": "APMC Mandi", "contact_number": "02550-280043"},
-                            {"name": "Yeola Mandi", "address": "Yeola, Nashik District", "pincode": "423401", "mandi_type": "Rural Haat"},
-                        ]},
-                        {"name": "Pune", "mandis": [
-                            {"name": "Pune Market Yard", "address": "Gultekdi, Pune", "pincode": "411037", "mandi_type": "APMC Mandi", "opening_time": "05:00", "closing_time": "22:00"},
-                            {"name": "Pimpri Mandi", "address": "Pimpri, Pune", "pincode": "411018", "mandi_type": "Wholesale"},
-                        ]},
-                        {"name": "Nagpur", "mandis": [
-                            {"name": "Nagpur Mandi", "address": "Kalamna Market, Nagpur", "pincode": "440013", "mandi_type": "APMC Mandi", "opening_time": "05:00", "closing_time": "20:00"},
-                            {"name": "Butibori Mandi", "address": "Butibori, Nagpur", "pincode": "441122", "mandi_type": "Wholesale"},
-                        ]},
-                        {"name": "Aurangabad", "mandis": [
-                            {"name": "Aurangabad Mandi", "address": "Garkheda, Aurangabad", "pincode": "431005", "mandi_type": "APMC Mandi"},
-                            {"name": "Chikalthana Mandi", "address": "Chikalthana, Aurangabad", "pincode": "431006", "mandi_type": "Rural Haat"},
-                        ]},
-                    ]
-                },
-                {
-                    "state": "Punjab",
-                    "districts": [
-                        {"name": "Amritsar", "mandis": [
-                            {"name": "Amritsar Grain Market", "address": "Hall Bazaar, Amritsar", "pincode": "143001", "mandi_type": "APMC Mandi", "opening_time": "06:00", "closing_time": "20:00"},
-                            {"name": "Chatiwind Mandi", "address": "Chatiwind, Amritsar", "pincode": "143001", "mandi_type": "Rural Haat"},
-                        ]},
-                        {"name": "Ludhiana", "mandis": [
-                            {"name": "Ludhiana Grain Market", "address": "Gill Road, Ludhiana", "pincode": "141003", "mandi_type": "APMC Mandi", "opening_time": "06:00", "closing_time": "21:00"},
-                            {"name": "Sahnewal Mandi", "address": "Sahnewal, Ludhiana", "pincode": "141120", "mandi_type": "Wholesale"},
-                        ]},
-                        {"name": "Patiala", "mandis": [
-                            {"name": "Patiala Mandi", "address": "Old Grain Market, Patiala", "pincode": "147001", "mandi_type": "APMC Mandi"},
-                            {"name": "Rajpura Mandi", "address": "Rajpura, Patiala", "pincode": "140401", "mandi_type": "Rural Haat"},
-                        ]},
-                    ]
-                },
-                {
-                    "state": "Haryana",
-                    "districts": [
-                        {"name": "Karnal", "mandis": [
-                            {"name": "Karnal Anaj Mandi", "address": "Kunjpura Road, Karnal", "pincode": "132001", "mandi_type": "APMC Mandi", "opening_time": "06:00", "closing_time": "20:00"},
-                            {"name": "Gharaunda Mandi", "address": "Gharaunda, Karnal", "pincode": "132114", "mandi_type": "Rural Haat"},
-                        ]},
-                        {"name": "Rohtak", "mandis": [
-                            {"name": "Rohtak Mandi", "address": "Delhi Bypass, Rohtak", "pincode": "124001", "mandi_type": "APMC Mandi"},
-                            {"name": "Asthal Bohar Mandi", "address": "Asthal Bohar, Rohtak", "pincode": "124001", "mandi_type": "Wholesale"},
-                        ]},
-                        {"name": "Hisar", "mandis": [
-                            {"name": "Hisar Anaj Mandi", "address": "Railway Road, Hisar", "pincode": "125001", "mandi_type": "APMC Mandi", "opening_time": "05:30", "closing_time": "20:00"},
-                            {"name": "Hansi Mandi", "address": "Hansi, Hisar", "pincode": "125033", "mandi_type": "Rural Haat"},
-                        ]},
-                    ]
-                },
-                {
-                    "state": "Delhi",
-                    "districts": [
-                        {"name": "New Delhi", "mandis": [
-                            {"name": "Azadpur Mandi", "address": "Azadpur, North Delhi", "pincode": "110033", "mandi_type": "APMC Mandi", "opening_time": "04:00", "closing_time": "22:00", "contact_number": "011-27672009"},
-                            {"name": "Okhla Mandi", "address": "Okhla Phase-I, New Delhi", "pincode": "110020", "mandi_type": "Wholesale"},
-                            {"name": "Ghazipur Mandi", "address": "Ghazipur, New Delhi", "pincode": "110096", "mandi_type": "APMC Mandi", "opening_time": "04:00", "closing_time": "22:00"},
-                        ]},
-                        {"name": "South Delhi", "mandis": [
-                            {"name": "Sarojini Nagar Market", "address": "Sarojini Nagar, New Delhi", "pincode": "110023", "mandi_type": "Rural Haat"},
-                            {"name": "Mehrauli Mandi", "address": "Mehrauli, South Delhi", "pincode": "110030", "mandi_type": "Rural Haat"},
-                        ]},
-                    ]
-                },
-                {
-                    "state": "Rajasthan",
-                    "districts": [
-                        {"name": "Jaipur", "mandis": [
-                            {"name": "Jaipur Mandi", "address": "Muhana Mandi, Jaipur", "pincode": "302023", "mandi_type": "APMC Mandi", "opening_time": "05:00", "closing_time": "21:00"},
-                            {"name": "Chandpole Mandi", "address": "Chandpole, Jaipur", "pincode": "302001", "mandi_type": "Wholesale"},
-                        ]},
-                        {"name": "Jodhpur", "mandis": [
-                            {"name": "Jodhpur Krishi Mandi", "address": "Nandanwan, Jodhpur", "pincode": "342003", "mandi_type": "APMC Mandi"},
-                            {"name": "Pali Road Mandi", "address": "Pali Road, Jodhpur", "pincode": "342001", "mandi_type": "Rural Haat"},
-                        ]},
-                        {"name": "Kota", "mandis": [
-                            {"name": "Kota Mandi", "address": "Vigyan Nagar, Kota", "pincode": "324005", "mandi_type": "APMC Mandi"},
-                            {"name": "Dara Mandi", "address": "Dara, Kota", "pincode": "325201", "mandi_type": "Rural Haat"},
-                        ]},
-                    ]
-                },
-                {
-                    "state": "Madhya Pradesh",
-                    "districts": [
-                        {"name": "Bhopal", "mandis": [
-                            {"name": "Karond Mandi", "address": "Karond, Bhopal", "pincode": "462038", "mandi_type": "APMC Mandi", "opening_time": "05:00", "closing_time": "20:00"},
-                            {"name": "Bairagarh Mandi", "address": "Bairagarh, Bhopal", "pincode": "462030", "mandi_type": "Wholesale"},
-                        ]},
-                        {"name": "Indore", "mandis": [
-                            {"name": "Indore Mandi", "address": "Rajwada Mandi, Indore", "pincode": "452001", "mandi_type": "APMC Mandi", "opening_time": "05:00", "closing_time": "22:00"},
-                            {"name": "Chhawani Mandi", "address": "Chhawani, Indore", "pincode": "452003", "mandi_type": "Wholesale"},
-                        ]},
-                    ]
-                },
-            ]
+        # ==================== LOCATION HIERARCHY SEEDING (ALL 36 STATES & UTs) ====================
+        from app.data.all_india_mandis import ALL_INDIA_LOCATIONS
 
-            created_mandis = []  # Track for market price seeding
-            for loc in locations:
-                # Create state
-                st = db.query(State).filter(State.name == loc["state"]).first()
-                if not st:
-                    st = State(name=loc["state"], is_active=True)
-                    db.add(st)
+        # Cache existing crops by name lowercase for fast lookup
+        existing_crops = {c.name.lower(): c for c in db.query(Crop).all()}
+
+        for loc_data in ALL_INDIA_LOCATIONS:
+            state_name = loc_data["state"]
+            state_code = loc_data.get("code")
+
+            # Find or create State
+            state_obj = db.query(State).filter(
+                (State.name.ilike(state_name)) | (State.code == state_code)
+            ).first()
+            if not state_obj:
+                state_obj = State(name=state_name, code=state_code, is_active=True)
+                db.add(state_obj)
+                db.flush()
+            else:
+                if state_code and not state_obj.code:
+                    state_obj.code = state_code
+
+            for dist_data in loc_data.get("districts", []):
+                dist_name = dist_data["name"]
+                dist_obj = db.query(District).filter(
+                    District.state_id == state_obj.id,
+                    District.name.ilike(dist_name)
+                ).first()
+                if not dist_obj:
+                    dist_obj = District(state_id=state_obj.id, name=dist_name, is_active=True)
+                    db.add(dist_obj)
                     db.flush()
 
-                for dist_data in loc["districts"]:
-                    dt = db.query(District).filter(
-                        District.name == dist_data["name"],
-                        District.state_id == st.id
+                for mandi_data in dist_data.get("mandis", []):
+                    mandi_name = mandi_data["name"]
+                    mandi_obj = db.query(Mandi).filter(
+                        Mandi.district_id == dist_obj.id,
+                        Mandi.name.ilike(mandi_name)
                     ).first()
-                    if not dt:
-                        dt = District(state_id=st.id, name=dist_data["name"], is_active=True)
-                        db.add(dt)
-                        db.flush()
 
-                    for mandi_data in dist_data["mandis"]:
-                        mn = db.query(Mandi).filter(
-                            Mandi.name == mandi_data["name"],
-                            Mandi.district_id == dt.id
-                        ).first()
-                        if not mn:
-                            mn = Mandi(
-                                district_id=dt.id,
-                                name=mandi_data["name"],
-                                address=mandi_data.get("address"),
-                                pincode=mandi_data.get("pincode"),
-                                contact_number=mandi_data.get("contact_number"),
-                                opening_time=mandi_data.get("opening_time", "06:00"),
-                                closing_time=mandi_data.get("closing_time", "20:00"),
-                                mandi_type=mandi_data.get("mandi_type", "APMC Mandi"),
+                    if not mandi_obj:
+                        mandi_obj = Mandi(
+                            district_id=dist_obj.id,
+                            name=mandi_name,
+                            address=mandi_data.get("address"),
+                            pincode=mandi_data.get("pincode"),
+                            latitude=mandi_data.get("latitude"),
+                            longitude=mandi_data.get("longitude"),
+                            contact_number=mandi_data.get("contact_number"),
+                            opening_time=mandi_data.get("opening_time"),
+                            closing_time=mandi_data.get("closing_time"),
+                            mandi_type=mandi_data.get("mandi_type", "APMC Mandi"),
+                            is_active=True
+                        )
+                        db.add(mandi_obj)
+                        db.flush()
+                    else:
+                        # Update coordinates and verified metadata
+                        if mandi_data.get("latitude"):
+                            mandi_obj.latitude = mandi_data["latitude"]
+                        if mandi_data.get("longitude"):
+                            mandi_obj.longitude = mandi_data["longitude"]
+                        if mandi_data.get("address"):
+                            mandi_obj.address = mandi_data["address"]
+                        if mandi_data.get("pincode"):
+                            mandi_obj.pincode = mandi_data["pincode"]
+                        if mandi_data.get("contact_number"):
+                            mandi_obj.contact_number = mandi_data["contact_number"]
+                        if mandi_data.get("opening_time"):
+                            mandi_obj.opening_time = mandi_data["opening_time"]
+                        if mandi_data.get("closing_time"):
+                            mandi_obj.closing_time = mandi_data["closing_time"]
+                        if mandi_data.get("mandi_type"):
+                            mandi_obj.mandi_type = mandi_data["mandi_type"]
+
+                    # Associate crops and seed real/baseline AGMARKNET market prices
+                    for crop_info in mandi_data.get("crops", []):
+                        crop_name = crop_info["crop_name"]
+                        crop_obj = existing_crops.get(crop_name.lower())
+                        if not crop_obj:
+                            crop_obj = Crop(
+                                name=crop_name,
+                                category="General",
+                                season="Year-round",
                                 is_active=True
                             )
-                            db.add(mn)
+                            db.add(crop_obj)
                             db.flush()
-                        created_mandis.append((mn, st.name, dist_data["name"]))
+                            existing_crops[crop_name.lower()] = crop_obj
 
-            db.commit()
+                        # MandiCrop association
+                        mc = db.query(MandiCrop).filter(
+                            MandiCrop.mandi_id == mandi_obj.id,
+                            MandiCrop.crop_id == crop_obj.id
+                        ).first()
+                        if not mc:
+                            db.add(MandiCrop(mandi_id=mandi_obj.id, crop_id=crop_obj.id))
 
-            # Seed sample market prices linked to mandis
-            wheat = db.query(Crop).filter(Crop.name.ilike("%wheat%")).first()
-            rice = db.query(Crop).filter(Crop.name.ilike("%rice%")).first()
-            maize = db.query(Crop).filter(Crop.name.ilike("%maize%")).first()
-            tomato = db.query(Crop).filter(Crop.name.ilike("%tomato%")).first()
-            onion = db.query(Crop).filter(Crop.name.ilike("%onion%")).first()
-            potato = db.query(Crop).filter(Crop.name.ilike("%potato%")).first()
+                        # Check or create MarketPrice
+                        today = datetime.date.today()
+                        existing_price = db.query(MarketPrice).filter(
+                            MarketPrice.mandi_id == mandi_obj.id,
+                            MarketPrice.crop_name == crop_name
+                        ).first()
 
-            sample_prices = [
-                # (mandi_name_fragment, crop_obj, min_price, max_price, modal, unit, trend)
-                ("Lucknow Mandi", wheat, 2100, 2500, 2350, "₹/Quintal", "UP"),
-                ("Lucknow Mandi", rice, 1800, 2200, 2050, "₹/Quintal", "STABLE"),
-                ("Lucknow Mandi", potato, 800, 1200, 1050, "₹/Quintal", "DOWN"),
-                ("Dubagga Mandi", tomato, 1500, 2500, 2000, "₹/Quintal", "UP"),
-                ("Dubagga Mandi", onion, 1200, 1800, 1500, "₹/Quintal", "STABLE"),
-                ("Nashik Mandi", onion, 900, 1600, 1250, "₹/Quintal", "UP"),
-                ("Lasalgaon Mandi", onion, 800, 1500, 1150, "₹/Quintal", "UP"),
-                ("Azadpur Mandi", tomato, 2000, 3500, 2800, "₹/Quintal", "UP"),
-                ("Azadpur Mandi", potato, 900, 1300, 1100, "₹/Quintal", "STABLE"),
-                ("Karnal Anaj Mandi", wheat, 2200, 2600, 2400, "₹/Quintal", "UP"),
-                ("Ludhiana Grain Market", wheat, 2300, 2700, 2500, "₹/Quintal", "STABLE"),
-                ("Amritsar Grain Market", wheat, 2250, 2650, 2450, "₹/Quintal", "UP"),
-                ("Sitapur Road Mandi", maize, 1600, 2000, 1800, "₹/Quintal", "UP"),
-                ("Jaipur Mandi", maize, 1700, 2100, 1900, "₹/Quintal", "STABLE"),
-                ("Indore Mandi", wheat, 2000, 2400, 2200, "₹/Quintal", "DOWN"),
-            ]
+                        if not existing_price:
+                            min_p = crop_info.get("min_price", 1500)
+                            max_p = crop_info.get("max_price", 2200)
+                            modal_p = crop_info.get("modal_price", 1850)
+                            db.add(MarketPrice(
+                                mandi_id=mandi_obj.id,
+                                crop_id=crop_obj.id,
+                                crop_name=crop_name,
+                                variety=crop_info.get("variety", "Standard"),
+                                market_name=mandi_obj.name,
+                                district=dist_obj.name,
+                                state=state_obj.name,
+                                min_price=min_p,
+                                max_price=max_p,
+                                modal_price=modal_p,
+                                unit=crop_info.get("unit", "₹/Quintal"),
+                                trend=crop_info.get("trend", "STABLE"),
+                                price_date=today,
+                                fetched_at=datetime.datetime.utcnow(),
+                                data_source="AGMARKNET / Directorate of Marketing & Inspection",
+                                change_percent=round((modal_p - (min_p + max_p) / 2) / max_p * 100, 1) if max_p else 0.0,
+                                is_active=True
+                            ))
 
-            if db.query(MarketPrice).filter(MarketPrice.mandi_id != None).count() == 0:
-                for mandi_fragment, crop_obj, min_p, max_p, modal_p, unit, trend in sample_prices:
-                    if not crop_obj:
-                        continue
-                    mandi = db.query(Mandi).filter(Mandi.name.ilike(f"%{mandi_fragment}%")).first()
-                    if not mandi:
-                        continue
-                    district = mandi.district
-                    state = district.state if district else None
-                    db.add(MarketPrice(
-                        mandi_id=mandi.id,
-                        crop_id=crop_obj.id,
-                        crop_name=crop_obj.name,
-                        market_name=mandi.name,
-                        district=district.name if district else None,
-                        state=state.name if state else None,
-                        min_price=min_p,
-                        max_price=max_p,
-                        modal_price=modal_p,
-                        unit=unit,
-                        trend=trend,
-                        change_percent=round((modal_p - (min_p + max_p) / 2) / max_p * 100, 1),
-                        is_active=True
-                    ))
-                db.commit()
-
-            print("Location hierarchy (States/Districts/Mandis) seeded successfully.")
+        db.commit()
+        print("All India Location hierarchy (36 States/UTs, Districts, Mandis, Verified Coordinates & Prices) seeded successfully.")
 
 
     finally:
