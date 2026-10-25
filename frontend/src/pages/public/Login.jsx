@@ -269,6 +269,33 @@ export const Login = () => {
               </label>
             </div>
 
+            {/* Quick Demo Fill */}
+            <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs space-y-1.5">
+              <span className="font-bold text-slate-700 block text-[11px]">Quick Demo Fill:</span>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEmail('admin@kisanmitra.com');
+                    setPassword('KisanMitra@2026');
+                  }}
+                  className="px-2.5 py-1 bg-purple-100 hover:bg-purple-200 text-purple-800 font-semibold text-[11px] rounded-lg cursor-pointer transition-colors"
+                >
+                  🛡️ Fill Admin (admin@kisanmitra.com)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEmail('farmer@kisanmitra.ai');
+                    setPassword('Farmer@123');
+                  }}
+                  className="px-2.5 py-1 bg-emerald-100 hover:bg-emerald-200 text-emerald-800 font-semibold text-[11px] rounded-lg cursor-pointer transition-colors"
+                >
+                  🌱 Fill Farmer (farmer@kisanmitra.ai)
+                </button>
+              </div>
+            </div>
+
             {/* Submit Button */}
             <button
               type="submit"

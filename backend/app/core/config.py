@@ -18,11 +18,12 @@ class Settings(BaseSettings):
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 7  # 7 days
     
-    # Database — auto-fix Render's postgres:// to postgresql+psycopg2://
-    DATABASE_URL: str = os.getenv(
-        "DATABASE_URL",
-        "sqlite:///kisanmitra.db"
-    ).replace("postgres://", "postgresql+psycopg2://", 1)
+    # Database — auto-fix Render's postgres:// or postgresql:// to postgresql+psycopg2://
+    DATABASE_URL: str = (
+        os.getenv("DATABASE_URL", "sqlite:///kisanmitra.db")
+        .replace("postgres://", "postgresql+psycopg2://", 1)
+        .replace("postgresql://", "postgresql+psycopg2://", 1)
+    )
     
     # Default seed credentials (defaults provided for deployment/seeding)
     ADMIN_PASSWORD: str = os.getenv("ADMIN_PASSWORD", "KisanMitra@2026")

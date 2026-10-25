@@ -65,8 +65,8 @@ def seed_database(db: Session = None):
             )
             db.add(admin_profile)
         elif admin_user:
-            # Ensure admin is active and has a password
-            if admin_pwd and not admin_user.password_hash:
+            # Ensure primary system admin always has the configured password
+            if admin_pwd:
                 admin_user.password_hash = hash_password(admin_pwd)
             admin_user.role_id = admin_role.id
             admin_user.is_active = True

@@ -103,10 +103,27 @@ export const AdminLogin = () => {
           </div>
 
 
+          <div className="p-3 bg-purple-950/50 border border-purple-800/60 rounded-xl text-xs flex items-center justify-between">
+            <div>
+              <span className="font-bold text-purple-300 block">Default Admin Credentials:</span>
+              <span className="text-[11px] text-slate-400">admin@kisanmitra.com | KisanMitra@2026</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                setEmail('admin@kisanmitra.com');
+                setPassword('KisanMitra@2026');
+              }}
+              className="px-2.5 py-1.5 bg-purple-600 hover:bg-purple-700 text-white font-bold text-[11px] rounded-lg cursor-pointer transition-colors"
+            >
+              Fill Admin
+            </button>
+          </div>
+
           <button
             type="submit"
             disabled={loading}
-            className="w-full py-3 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white font-bold rounded-xl text-sm shadow-md hover:shadow-lg transition-all flex items-center justify-center space-x-2"
+            className="w-full py-3 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white font-bold rounded-xl text-sm shadow-md hover:shadow-lg transition-all flex items-center justify-center space-x-2 cursor-pointer"
           >
             <span>{loading ? 'Authenticating...' : 'Enter Admin Control Panel'}</span>
             <ArrowRight className="w-4 h-4" />
