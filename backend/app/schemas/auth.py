@@ -27,7 +27,7 @@ class UserRegister(BaseModel):
     crop_ids: Optional[List[int]] = []
 
 class UserLogin(BaseModel):
-    email: EmailStr
+    email: str
     password: str
 
 class UserProfileOut(BaseModel):

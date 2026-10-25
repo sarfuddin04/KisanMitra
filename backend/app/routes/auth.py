@@ -149,17 +149,22 @@ def register_user(req: UserRegister, db: Session = Depends(get_db)):
 
 @router.post("/login", response_model=Token)
 def login_user(req: UserLogin, db: Session = Depends(get_db)):
-    clean_email = req.email.lower().strip()
-    user = db.query(User).filter(User.email == clean_email).first()
+    clean_input = req.email.lower().strip()
+    user = db.query(User).filter(User.email == clean_input).first()
     if not user:
-        if clean_email == "admin@kisanmitra.ai":
+        if clean_input == "admin@kisanmitra.ai":
             user = db.query(User).filter(User.email == "admin@kisanmitra.com").first()
-        elif clean_email == "admin@kisanmitra.com":
+        elif clean_input == "admin@kisanmitra.com":
             user = db.query(User).filter(User.email == "admin@kisanmitra.ai").first()
+        else:
+            # Also allow login with mobile phone number
+            raw_input = req.email.strip()
+            user = db.query(User).filter(User.phone == raw_input).first()
+
     if not user or not verify_password(req.password, user.password_hash):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid email or password."
+            detail="Invalid email/phone or password."
         )
         
     if not user.is_active:

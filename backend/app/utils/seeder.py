@@ -64,11 +64,11 @@ def seed_database(db: Session = None):
                 bio="Agricultural Systems Administrator"
             )
             db.add(admin_profile)
-        elif admin_user and admin_pwd:
-            # Always ensure admin credentials and role are correct on every startup
-            admin_user.email = "admin@kisanmitra.com"
+        elif admin_user:
+            # Ensure admin is active and has a password
+            if admin_pwd and not admin_user.password_hash:
+                admin_user.password_hash = hash_password(admin_pwd)
             admin_user.role_id = admin_role.id
-            admin_user.password_hash = hash_password(admin_pwd)
             admin_user.is_active = True
             admin_user.is_verified = True
             db.commit()
@@ -101,8 +101,9 @@ def seed_database(db: Session = None):
             )
             db.add(farmer_profile)
             db.commit()
-        elif farmer_user and farmer_pwd:
-            farmer_user.password_hash = hash_password(farmer_pwd)
+        elif farmer_user:
+            if farmer_pwd and not farmer_user.password_hash:
+                farmer_user.password_hash = hash_password(farmer_pwd)
             farmer_user.is_active = True
             farmer_user.is_verified = True
             db.commit()
@@ -241,7 +242,10 @@ def seed_database(db: Session = None):
             }
         ]
         for c in crops_data:
-            existing_crop = db.query(Crop).filter((Crop.name == c["name"]) | (Crop.name == c["name"].split(" ")[0])).first()
+            existing_crop = db.query(Crop).filter(Crop.name == c["name"]).first()
+            if not existing_crop:
+                prefix = c["name"].split(" ")[0]
+                existing_crop = db.query(Crop).filter(Crop.name == prefix).first()
             if existing_crop:
                 for k, v in c.items():
                     setattr(existing_crop, k, v)

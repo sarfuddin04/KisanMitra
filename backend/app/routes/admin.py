@@ -303,8 +303,31 @@ def list_users(search: Optional[str] = Query(None), db: Session = Depends(get_db
         ) for u in users
     ]
 
+@router.get("/users/{user_id}", response_model=UserOut)
+def get_single_user(user_id: int, db: Session = Depends(get_db)):
+    """Fetch a single user by ID."""
+    u = db.query(User).filter(User.id == user_id).first()
+    if not u:
+        raise HTTPException(status_code=404, detail="User not found.")
+    return UserOut(
+        id=u.id,
+        full_name=u.full_name,
+        email=u.email,
+        phone=u.phone,
+        role_name=u.role.name if u.role else "FARMER",
+        is_active=u.is_active,
+        preferred_language=u.preferred_language,
+        created_at=u.created_at,
+        profile=u.profile
+    )
+
+
 @router.post("/users", response_model=UserOut)
 def create_new_admin_or_user(req: AdminCreateUser, db: Session = Depends(get_db)):
+    """
+    Create a new administrator or safely promote an existing user to ADMIN
+    WITHOUT deleting any existing crops, products, recommendations, or activity data.
+    """
     clean_email = req.email.strip().lower() if req.email else ""
     clean_phone = req.phone.strip() if (req.phone and req.phone.strip()) else None
     clean_name = req.full_name.strip() if req.full_name else ""
@@ -315,24 +338,7 @@ def create_new_admin_or_user(req: AdminCreateUser, db: Session = Depends(get_db)
             detail="A valid email address is required."
         )
 
-    # Check if email exists
-    existing = db.query(User).filter(User.email == clean_email).first()
-    if existing:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="A user with this email address already exists."
-        )
-
-    # Check phone
-    if clean_phone:
-        existing_phone = db.query(User).filter(User.phone == clean_phone).first()
-        if existing_phone:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="A user with this phone number already exists."
-            )
-
-    # Resolve role
+    # Resolve target role
     target_role = (req.role_name or "ADMIN").upper()
     role = db.query(Role).filter(Role.name == target_role).first()
     if not role:
@@ -340,6 +346,60 @@ def create_new_admin_or_user(req: AdminCreateUser, db: Session = Depends(get_db)
         db.add(role)
         db.commit()
         db.refresh(role)
+
+    # Check if email already exists -> UPGRADE / SAVE WITHOUT DELETING
+    existing = db.query(User).filter(User.email == clean_email).first()
+    if existing:
+        try:
+            existing.role_id = role.id
+            if clean_name:
+                existing.full_name = clean_name
+            if clean_phone:
+                existing.phone = clean_phone
+            if req.password:
+                existing.password_hash = hash_password(req.password)
+            existing.is_active = True
+            existing.is_verified = True
+
+            # Preserve existing profile and update location if empty
+            if not existing.profile:
+                profile = UserProfile(
+                    user_id=existing.id,
+                    farm_location=req.farm_location.strip() if req.farm_location else "KisanMitra Administration",
+                    bio="Administrator Account" if target_role == "ADMIN" else "Registered User"
+                )
+                db.add(profile)
+            elif req.farm_location and not existing.profile.farm_location:
+                existing.profile.farm_location = req.farm_location.strip()
+
+            db.commit()
+            db.refresh(existing)
+            return UserOut(
+                id=existing.id,
+                full_name=existing.full_name,
+                email=existing.email,
+                phone=existing.phone,
+                role_name=role.name,
+                is_active=existing.is_active,
+                preferred_language=existing.preferred_language,
+                created_at=existing.created_at,
+                profile=existing.profile
+            )
+        except Exception as e:
+            db.rollback()
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Failed to update existing user: {str(e)}"
+            )
+
+    # Check phone uniqueness for new accounts
+    if clean_phone:
+        existing_phone = db.query(User).filter(User.phone == clean_phone).first()
+        if existing_phone:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="A user with this phone number already exists."
+            )
 
     try:
         new_user = User(
@@ -384,6 +444,98 @@ def create_new_admin_or_user(req: AdminCreateUser, db: Session = Depends(get_db)
         profile=new_user.profile
     )
 
+
+@router.put("/users/{user_id}/role")
+def change_user_role(user_id: int, req: dict, db: Session = Depends(get_db)):
+    """
+    Change user role between ADMIN and FARMER safely.
+    Zero data loss: all products, crops, orders, and profile details remain preserved.
+    """
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found.")
+
+    target_role_name = (req.get("role_name") or "ADMIN").upper()
+    role = db.query(Role).filter(Role.name == target_role_name).first()
+    if not role:
+        role = Role(name=target_role_name, description=f"{target_role_name.capitalize()} user account")
+        db.add(role)
+        db.commit()
+        db.refresh(role)
+
+    user.role_id = role.id
+    db.commit()
+    db.refresh(user)
+
+    return {
+        "message": f"User '{user.full_name}' role successfully updated to {role.name}. All user data preserved.",
+        "id": user.id,
+        "role_name": role.name
+    }
+
+
+@router.put("/users/{user_id}", response_model=UserOut)
+def update_user_account(user_id: int, req: dict, db: Session = Depends(get_db)):
+    """
+    Update user profile, promote to Admin, or reset password safely in-place.
+    Preserves all existing user records, products, recommendations, and orders.
+    """
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found.")
+
+    if "full_name" in req and req["full_name"]:
+        user.full_name = req["full_name"].strip()
+
+    if "phone" in req:
+        clean_phone = req["phone"].strip() if req["phone"] else None
+        if clean_phone and clean_phone != user.phone:
+            exists = db.query(User).filter(User.phone == clean_phone, User.id != user_id).first()
+            if exists:
+                raise HTTPException(status_code=400, detail="Phone number already registered to another user.")
+            user.phone = clean_phone
+
+    if "role_name" in req and req["role_name"]:
+        target_role = req["role_name"].upper()
+        role = db.query(Role).filter(Role.name == target_role).first()
+        if not role:
+            role = Role(name=target_role, description=f"{target_role.capitalize()} user account")
+            db.add(role)
+            db.commit()
+            db.refresh(role)
+        user.role_id = role.id
+
+    if "password" in req and req["password"]:
+        if len(req["password"]) < 6:
+            raise HTTPException(status_code=400, detail="Password must be at least 6 characters.")
+        user.password_hash = hash_password(req["password"])
+
+    if "is_active" in req:
+        user.is_active = bool(req["is_active"])
+
+    if "farm_location" in req and req["farm_location"]:
+        if not user.profile:
+            user.profile = UserProfile(user_id=user.id, farm_location=req["farm_location"].strip())
+            db.add(user.profile)
+        else:
+            user.profile.farm_location = req["farm_location"].strip()
+
+    db.commit()
+    db.refresh(user)
+
+    return UserOut(
+        id=user.id,
+        full_name=user.full_name,
+        email=user.email,
+        phone=user.phone,
+        role_name=user.role.name if user.role else "FARMER",
+        is_active=user.is_active,
+        preferred_language=user.preferred_language,
+        created_at=user.created_at,
+        profile=user.profile
+    )
+
+
 @router.put("/users/{user_id}/status")
 def toggle_user_status(user_id: int, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.id == user_id).first()
@@ -392,6 +544,7 @@ def toggle_user_status(user_id: int, db: Session = Depends(get_db)):
     user.is_active = not user.is_active
     db.commit()
     return {"message": f"User status set to {'Active' if user.is_active else 'Inactive'}"}
+
 
 @router.delete("/users/{user_id}")
 def delete_user(user_id: int, db: Session = Depends(get_db)):
