@@ -1803,6 +1803,7 @@ def admin_sync_all_india_directory(db: Session = Depends(get_db)):
                         is_active=True
                     )
                     db.add(mandi_obj)
+                    db.flush()
                     mandis_synced += 1
                 else:
                     if mandi_data.get("latitude") and not mandi_obj.latitude:
@@ -1812,8 +1813,49 @@ def admin_sync_all_india_directory(db: Session = Depends(get_db)):
                     mandi_obj.is_verified = True
                     mandi_obj.verification_status = "VERIFIED"
                     if not mandi_obj.data_source:
-                        mandi_obj.data_source = "AGMARKNET / Directorate of Marketing & Inspection"
+                        mandi_obj.data_source = mandi_data.get("data_source", "AGMARKNET / Directorate of Marketing & Inspection")
                     mandis_synced += 1
+
+                # Link crops
+                for crop_name in mandi_data.get("crops", []):
+                    crop_obj = db.query(Crop).filter(Crop.name.ilike(crop_name)).first()
+                    if not crop_obj:
+                        crop_obj = Crop(name=crop_name, category="Grain", is_active=True)
+                        db.add(crop_obj)
+                        db.flush()
+                    mc_exists = db.query(MandiCrop).filter(
+                        MandiCrop.mandi_id == mandi_obj.id,
+                        MandiCrop.crop_id == crop_obj.id
+                    ).first()
+                    if not mc_exists:
+                        db.add(MandiCrop(mandi_id=mandi_obj.id, crop_id=crop_obj.id))
+
+                # Link baseline prices
+                for p_data in mandi_data.get("prices", []):
+                    c_name = p_data.get("crop")
+                    c_obj = db.query(Crop).filter(Crop.name.ilike(c_name)).first()
+                    if not c_obj:
+                        c_obj = Crop(name=c_name, category="General", is_active=True)
+                        db.add(c_obj)
+                        db.flush()
+                    existing_price = db.query(MarketPrice).filter(
+                        MarketPrice.mandi_id == mandi_obj.id,
+                        MarketPrice.crop_id == c_obj.id
+                    ).first()
+                    if not existing_price:
+                        mp = MarketPrice(
+                            mandi_id=mandi_obj.id,
+                            crop_id=c_obj.id,
+                            variety=p_data.get("variety", "Standard"),
+                            min_price=float(p_data.get("min", 0)),
+                            max_price=float(p_data.get("max", 0)),
+                            modal_price=float(p_data.get("modal", 0)),
+                            price_date=datetime.date.today(),
+                            unit=p_data.get("unit", "Quintal"),
+                            data_source=mandi_data.get("data_source", "AGMARKNET / Directorate of Marketing & Inspection"),
+                            trend="STABLE"
+                        )
+                        db.add(mp)
 
     db.commit()
 

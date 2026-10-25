@@ -27,6 +27,8 @@ class StateUpdate(BaseModel):
 
 class StateOut(StateBase):
     id: int
+    district_count: Optional[int] = 0
+    mandi_count: Optional[int] = 0
     created_at: datetime
     updated_at: datetime
 
@@ -61,6 +63,7 @@ class DistrictUpdate(BaseModel):
 class DistrictOut(DistrictBase):
     id: int
     state_name: Optional[str] = None
+    mandi_count: Optional[int] = 0
     created_at: datetime
     updated_at: datetime
 
@@ -119,6 +122,11 @@ class MandiOut(MandiBase):
     crops: Optional[List[dict]] = None
     average_rating: Optional[float] = 0.0
     review_count: Optional[int] = 0
+    operating_status: Optional[str] = "HOURS_UNKNOWN"
+    status_label: Optional[str] = "Hours Unknown"
+    status_detail: Optional[str] = None
+    has_prices: Optional[bool] = False
+    distance_km: Optional[float] = None
     created_at: datetime
     updated_at: datetime
 
