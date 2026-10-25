@@ -1,8 +1,9 @@
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
 from typing import List, Optional
+from sqlalchemy.orm import Session
 from app.services.ai_assistant import ask_agronomist_ai
-from app.core.deps import get_optional_user
+from app.core.deps import get_optional_user, get_db
 from app.models.user import User
 
 router = APIRouter(prefix="/ai-assistant", tags=["AI Farming Assistant"])
@@ -32,11 +33,13 @@ class ChatResponse(BaseModel):
 @router.post("/chat", response_model=ChatResponse)
 def chat_with_agronomist(
     req: ChatRequest,
-    current_user: Optional[User] = Depends(get_optional_user)
+    current_user: Optional[User] = Depends(get_optional_user),
+    db: Session = Depends(get_db),
 ):
     """
     Conversational AI agriculture advisor endpoint.
     Accepts user message + chat history for context-aware responses.
+    Leverages real agronomy database, market prices, weather service, and farmer profile.
     """
     history_dict = (
         [{"sender": m.sender, "text": m.text} for m in req.history]
@@ -45,6 +48,8 @@ def chat_with_agronomist(
     )
     reply = ask_agronomist_ai(
         user_message=req.message,
-        chat_history=history_dict
+        chat_history=history_dict,
+        db=db,
+        current_user=current_user
     )
     return ChatResponse(reply=reply)

@@ -2,20 +2,21 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import ReactMarkdown from 'react-markdown';
 import {
   Bot, Send, User, Sparkles, Trash2, RefreshCw,
-  Wheat, Leaf, Droplets, Bug, FlaskConical, Sun, MessageCircle
+  Wheat, Leaf, Droplets, Bug, FlaskConical, Sun, MessageCircle,
+  TrendingUp, CloudRain
 } from 'lucide-react';
 import api from '../../services/api';
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Quick prompts in Hindi/Hinglish + English for natural farmer conversations
+// Contextually useful quick prompts in Hindi/Hinglish for natural farmer conversations
 // ─────────────────────────────────────────────────────────────────────────────
 const QUICK_PROMPTS = [
-  { icon: Wheat,       label: "Gehu mein patta peela ho raha hai",       emoji: "🌾" },
-  { icon: Bug,         label: "Tamatar mein keeda lag gaya",             emoji: "🐛" },
-  { icon: Leaf,        label: "Aloo mein patta murjha rha hai kya kru",  emoji: "🥔" },
-  { icon: FlaskConical,label: "Urea kab aur kitna daalu?",              emoji: "🧪" },
-  { icon: Droplets,    label: "Drip irrigation subsidy kaise milegi?",   emoji: "💧" },
-  { icon: Sun,         label: "Main organic kheti shuru karna chahta hu", emoji: "🌿" },
+  { icon: Wheat,        label: "Gehu mein patte peele ho rahe hain",         emoji: "🌾" },
+  { icon: Bug,          label: "Tamatar mein keede lag gaye hain",           emoji: "🐛" },
+  { icon: FlaskConical, label: "Meri fasal ke liye fertilizer dosage batao", emoji: "🧪" },
+  { icon: CloudRain,    label: "Kal baarish hogi to kya aaj sinchai karun?", emoji: "🌧️" },
+  { icon: TrendingUp,   label: "Mere district ka aaj ka mandi bhav batao",   emoji: "📊" },
+  { icon: Droplets,     label: "Mere khet mein paani ruk jata hai, kya karun?", emoji: "💧" },
 ];
 
 // ─────────────────────────────────────────────────────────────────────────────
