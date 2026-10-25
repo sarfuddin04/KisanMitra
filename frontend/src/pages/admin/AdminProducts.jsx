@@ -2,9 +2,10 @@ import React, { useState, useEffect } from 'react';
 import {
   ShoppingBag, Trash2, Search, CheckCircle2, XCircle,
   Edit3, X, MapPin, Upload, Image as ImageIcon, Plus,
-  Eye, RefreshCw, Filter
+  Eye, RefreshCw, Filter, Layers
 } from 'lucide-react';
 import api from '../../services/api';
+import { ProductImageManager, getDisplayUrl } from '../../components/ProductImageManager';
 
 const PRODUCT_FALLBACK = 'https://images.unsplash.com/photo-1574943320219-553eb213f72d?w=400&q=80';
 const inputClass = "w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-xl text-xs text-white outline-none focus:ring-1 focus:ring-emerald-500";
@@ -48,6 +49,7 @@ export const AdminProducts = () => {
   const [categories, setCategories] = useState([]);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
+  const [categoryFilter, setCategoryFilter] = useState('');
   const [loading, setLoading] = useState(true);
   const [editModal, setEditModal] = useState(false);
   const [editItem, setEditItem] = useState(null);
@@ -58,7 +60,9 @@ export const AdminProducts = () => {
     try {
       const params = new URLSearchParams();
       if (search) params.append('search', search);
-      // Admin gets all products regardless of status
+      if (statusFilter) params.append('status', statusFilter);
+      if (categoryFilter) params.append('category_id', categoryFilter);
+
       const [pRes, cRes] = await Promise.all([
         api.get(`/admin/products?${params.toString()}`).catch(() => api.get(`/marketplace/products?limit=500&${params.toString()}`)),
         api.get('/marketplace/categories')
@@ -72,7 +76,7 @@ export const AdminProducts = () => {
     }
   };
 
-  useEffect(() => { fetchProducts(); }, []);
+  useEffect(() => { fetchProducts(); }, [statusFilter, categoryFilter]);
 
   const handleApprove = async (id) => {
     try { await api.put(`/admin/products/${id}/approve`); fetchProducts(); }
@@ -96,11 +100,23 @@ export const AdminProducts = () => {
     setForm({
       name: p.name, description: p.description, price: p.price,
       unit: p.unit, stock_quantity: p.stock_quantity, location: p.location,
-      image_url: p.image_url, is_available: p.is_available, is_organic: p.is_organic,
+      image_url: p.image_url,
+      images: p.images || [],
+      is_available: p.is_available, is_organic: p.is_organic,
       category_id: p.category_id,
       state_id: p.state_id || '', district_id: p.district_id || '', mandi_id: p.mandi_id || '',
     });
     setEditModal(true);
+    // Fetch full latest product details including images
+    api.get(`/admin/products/${p.id}`).then(r => {
+      if (r.data) {
+        setForm(prev => ({
+          ...prev,
+          images: r.data.images || prev.images || [],
+          image_url: r.data.image_url || prev.image_url
+        }));
+      }
+    }).catch(() => {});
   };
 
   const handleEdit = async (e) => {
@@ -122,25 +138,11 @@ export const AdminProducts = () => {
     }
   };
 
-  const handleImageUpload = async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    if (file.size > 5 * 1024 * 1024) { alert('Max 5MB.'); return; }
-    const fd = new FormData();
-    fd.append('file', file);
-    fd.append('upload_type', 'products');
-    try {
-      const res = await api.post('/upload/image', fd, { headers: { 'Content-Type': 'multipart/form-data' } });
-      setForm(p => ({ ...p, image_url: res.data.file_path || res.data.url }));
-    } catch { alert('Upload failed.'); }
-  };
-
-  const getImg = (url) => {
-    if (!url) return PRODUCT_FALLBACK;
-    return url.startsWith('http') ? url : `/api/static/${url}`;
-  };
-
-  const filtered = statusFilter ? products.filter(p => (p.status || 'PENDING') === statusFilter) : products;
+  const filtered = products.filter(p => {
+    if (statusFilter && (p.status || 'PENDING') !== statusFilter) return false;
+    if (categoryFilter && String(p.category_id) !== String(categoryFilter)) return false;
+    return true;
+  });
 
   return (
     <div className="max-w-6xl mx-auto space-y-6">
@@ -148,9 +150,11 @@ export const AdminProducts = () => {
         <div>
           <h2 className="text-2xl font-black text-white tracking-tight flex items-center space-x-2">
             <ShoppingBag className="w-7 h-7 text-emerald-400" />
-            <span>Marketplace Products & Moderation</span>
+            <span>Marketplace Products & Image Management</span>
           </h2>
-          <p className="text-xs text-slate-400 mt-1">Approve, edit, reject or delete farmer product listings</p>
+          <p className="text-xs text-slate-400 mt-1">
+            Manage product images, categories, details and moderation across all products
+          </p>
         </div>
       </div>
 
@@ -163,6 +167,13 @@ export const AdminProducts = () => {
             placeholder="Search products, sellers, mandi..."
             className="pl-9 pr-4 py-2 bg-slate-900 border border-slate-700 text-xs rounded-xl text-white outline-none focus:ring-2 focus:ring-emerald-500 w-full" />
         </div>
+        <select value={categoryFilter} onChange={e => setCategoryFilter(e.target.value)}
+          className="px-3 py-2 bg-slate-900 border border-slate-700 text-xs rounded-xl text-slate-300">
+          <option value="">All Categories</option>
+          {categories.map(c => (
+            <option key={c.id} value={c.id}>{c.name}</option>
+          ))}
+        </select>
         <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)}
           className="px-3 py-2 bg-slate-900 border border-slate-700 text-xs rounded-xl text-slate-300">
           <option value="">All Status</option>
@@ -197,9 +208,16 @@ export const AdminProducts = () => {
                 {filtered.map(p => (
                   <tr key={p.id} className="hover:bg-slate-800/30 transition-colors">
                     <td className="py-3 px-4">
-                      <img src={getImg(p.image_url)} alt={p.name}
-                        className="w-14 h-14 object-cover rounded-xl border border-slate-700"
-                        onError={e => { e.target.src = PRODUCT_FALLBACK; }} />
+                      <div className="relative w-14 h-14 rounded-xl overflow-hidden border border-slate-700 bg-slate-800 group">
+                        <img src={getDisplayUrl(p.image_url)} alt={p.name}
+                          className="w-full h-full object-cover"
+                          onError={e => { e.target.src = PRODUCT_FALLBACK; }} />
+                        {p.images && p.images.length > 1 && (
+                          <span className="absolute bottom-1 right-1 bg-black/80 text-[9px] font-bold text-emerald-400 px-1 py-0.2 rounded flex items-center gap-0.5">
+                            <Layers className="w-2.5 h-2.5" /> {p.images.length}
+                          </span>
+                        )}
+                      </div>
                     </td>
                     <td className="py-3 px-4">
                       <span className="font-bold text-white block text-sm">{p.name}</span>
@@ -261,31 +279,29 @@ export const AdminProducts = () => {
       {/* Edit Modal */}
       {editModal && editItem && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-slate-900 rounded-3xl border border-slate-700 max-w-xl w-full max-h-[90vh] overflow-y-auto p-6 space-y-4 relative">
+          <div className="bg-slate-900 rounded-3xl border border-slate-700 max-w-2xl w-full max-h-[90vh] overflow-y-auto p-6 space-y-4 relative">
             <button onClick={() => setEditModal(false)} className="absolute top-4 right-4 p-1.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg">
               <X className="w-4 h-4" />
             </button>
-            <h3 className="text-lg font-black text-white">Edit Product: {editItem.name}</h3>
+            <h3 className="text-lg font-black text-white">Edit Product & Images: {editItem.name}</h3>
 
             <form onSubmit={handleEdit} className="space-y-4">
-              {/* Product Image */}
-              <div>
-                <label className="block text-xs font-bold text-slate-300 mb-1.5">Product Image</label>
-                <div className="flex items-center gap-3">
-                  {form.image_url && (
-                    <img src={getImg(form.image_url)} alt="Preview"
-                      className="w-16 h-16 object-cover rounded-xl border border-slate-700"
-                      onError={e => { e.target.src = PRODUCT_FALLBACK; }} />
-                  )}
-                  <label className="cursor-pointer px-3 py-2 bg-slate-800 hover:bg-slate-700 rounded-xl text-xs font-bold text-slate-300 flex items-center gap-1.5">
-                    <Upload className="w-3.5 h-3.5" /> Upload New Image
-                    <input type="file" accept=".jpg,.jpeg,.png,.webp" className="hidden" onChange={handleImageUpload} />
-                  </label>
-                  {form.image_url && (
-                    <button type="button" onClick={() => setForm(p => ({ ...p, image_url: '' }))}
-                      className="text-[10px] text-red-400 hover:underline">Remove</button>
-                  )}
-                </div>
+              {/* Product Image Manager */}
+              <div className="p-4 bg-slate-950/80 rounded-2xl border border-slate-800">
+                <ProductImageManager
+                  productId={editItem.id}
+                  images={form.images || []}
+                  primaryImageUrl={form.image_url || ''}
+                  isAdmin={true}
+                  onChange={({ images, primaryImageUrl }) => {
+                    setForm(prev => ({
+                      ...prev,
+                      images,
+                      image_url: primaryImageUrl
+                    }));
+                    setProducts(prev => prev.map(item => item.id === editItem.id ? { ...item, image_url: primaryImageUrl, images } : item));
+                  }}
+                />
               </div>
 
               <div>

@@ -56,13 +56,34 @@ class ProductUpdate(BaseModel):
     is_available: Optional[bool] = None
     is_organic: Optional[bool] = None
 
+
+class ProductImageOut(BaseModel):
+    id: int
+    product_id: int
+    image_url: str
+    is_primary: bool = False
+    display_order: int = 0
+    created_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+
 class ProductOut(ProductBase):
     id: int
     seller_id: int
     seller_name: Optional[str] = None
     seller_phone: Optional[str] = None
     category_name: Optional[str] = None
+    state_id: Optional[int] = None
+    district_id: Optional[int] = None
+    mandi_id: Optional[int] = None
+    state_name: Optional[str] = None
+    district_name: Optional[str] = None
+    mandi_name: Optional[str] = None
     rating: float = 4.8
+    status: Optional[str] = "PENDING"
+    images: List[ProductImageOut] = []
     created_at: datetime
     updated_at: datetime
 

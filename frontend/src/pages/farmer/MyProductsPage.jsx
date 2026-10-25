@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Package, Plus, Trash2, Edit3, X, ShoppingBag, MapPin, Upload, Image as ImageIcon } from 'lucide-react';
+import { Package, Plus, Trash2, Edit3, X, ShoppingBag, MapPin, Upload, Image as ImageIcon, Layers } from 'lucide-react';
 import api from '../../services/api';
+import { ProductImageManager, getDisplayUrl } from '../../components/ProductImageManager';
 
 const PRODUCT_FALLBACK = 'https://images.unsplash.com/photo-1574943320219-553eb213f72d?w=400&q=80';
 
@@ -20,6 +21,7 @@ export const MyProductsPage = () => {
     name: '', category_id: '', description: '', price: '',
     unit: 'kg', stock_quantity: '', location: '',
     is_organic: false, image_url: '',
+    images: [],
     state_id: '', district_id: '', mandi_id: '',
   });
 
@@ -78,9 +80,20 @@ export const MyProductsPage = () => {
       unit: p.unit || 'kg', stock_quantity: p.stock_quantity || '',
       location: p.location || '', is_organic: p.is_organic || false,
       image_url: p.image_url || '',
+      images: p.images || [],
       state_id: p.state_id || '', district_id: p.district_id || '', mandi_id: p.mandi_id || '',
     });
     setIsModalOpen(true);
+    // Proactively fetch latest images for this product
+    api.get(`/marketplace/products/${p.id}/images`).then(r => {
+      if (r.data && Array.isArray(r.data)) {
+        setFormData(prev => ({
+          ...prev,
+          images: r.data,
+          image_url: r.data.find(img => img.is_primary)?.image_url || prev.image_url
+        }));
+      }
+    }).catch(() => {});
   };
 
   const handleSubmit = async (e) => {
@@ -94,6 +107,11 @@ export const MyProductsPage = () => {
         state_id: formData.state_id ? parseInt(formData.state_id) : null,
         district_id: formData.district_id ? parseInt(formData.district_id) : null,
         mandi_id: formData.mandi_id ? parseInt(formData.mandi_id) : null,
+        images: (formData.images || []).map((img, idx) => ({
+          image_url: img.image_url,
+          is_primary: !!img.is_primary,
+          display_order: typeof img.display_order === 'number' ? img.display_order : idx
+        }))
       };
       if (editingProduct) {
         await api.put(`/marketplace/products/${editingProduct.id}`, payload);
@@ -114,35 +132,6 @@ export const MyProductsPage = () => {
     }
   };
 
-  // Image upload handler
-  const handleImageUpload = async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
-    if (!allowedTypes.includes(file.type)) {
-      alert('Only JPG, PNG, WEBP images are allowed.');
-      return;
-    }
-    if (file.size > 5 * 1024 * 1024) {
-      alert('Image must be under 5MB.');
-      return;
-    }
-    const fd = new FormData();
-    fd.append('file', file);
-    fd.append('upload_type', 'products');
-    try {
-      const res = await api.post('/upload/image', fd, { headers: { 'Content-Type': 'multipart/form-data' } });
-      setFormData(p => ({ ...p, image_url: res.data.file_path || res.data.url }));
-    } catch (err) {
-      alert('Image upload failed.');
-    }
-  };
-
-  const getImageUrl = (url) => {
-    if (!url) return PRODUCT_FALLBACK;
-    return url.startsWith('http') ? url : `/api/static/${url}`;
-  };
-
   const inputClass = "w-full px-3 py-2.5 rounded-xl border border-gray-300 text-xs font-semibold focus:ring-2 focus:ring-emerald-500 outline-hidden";
 
   return (
@@ -153,7 +142,7 @@ export const MyProductsPage = () => {
             <Package className="w-7 h-7 text-emerald-600" />
             <span>My Farm Produce & Listings</span>
           </h2>
-          <p className="text-xs text-gray-500 mt-1">Manage your harvest crops listed on the marketplace</p>
+          <p className="text-xs text-gray-500 mt-1">Manage your harvest crops, photos, and marketplace inventory</p>
         </div>
         <button onClick={openCreate}
           className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-md transition-all flex items-center space-x-1.5">
@@ -168,10 +157,15 @@ export const MyProductsPage = () => {
         ) : products.length > 0 ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 p-5">
             {products.map(p => (
-              <div key={p.id} className="rounded-2xl border border-gray-100 overflow-hidden hover:shadow-md transition-shadow">
-                <div className="h-36 overflow-hidden relative">
-                  <img src={getImageUrl(p.image_url)} alt={p.name} className="w-full h-full object-cover"
+              <div key={p.id} className="rounded-2xl border border-gray-100 overflow-hidden hover:shadow-md transition-shadow group">
+                <div className="h-40 overflow-hidden relative">
+                  <img src={getDisplayUrl(p.image_url)} alt={p.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                     onError={(e) => { e.target.src = PRODUCT_FALLBACK; }} />
+                  {p.images && p.images.length > 1 && (
+                    <span className="absolute bottom-2 left-2 px-2 py-0.5 rounded-md text-[10px] font-bold bg-black/75 text-white backdrop-blur-xs flex items-center gap-1 shadow">
+                      <Layers className="w-3 h-3 text-emerald-400" /> {p.images.length} photos
+                    </span>
+                  )}
                   <span className={`absolute top-2 right-2 px-2 py-0.5 rounded-full text-[10px] font-bold ${
                     p.status === 'APPROVED' ? 'bg-emerald-100 text-emerald-800' :
                     p.status === 'REJECTED' ? 'bg-red-100 text-red-800' :
@@ -217,16 +211,35 @@ export const MyProductsPage = () => {
       {/* Create/Edit Modal */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl max-w-xl w-full max-h-[90vh] overflow-y-auto p-6 sm:p-8 space-y-5 relative">
+          <div className="bg-white rounded-3xl max-w-2xl w-full max-h-[90vh] overflow-y-auto p-6 sm:p-8 space-y-5 relative">
             <button onClick={() => setIsModalOpen(false)} className="absolute top-5 right-5 p-2 rounded-xl text-gray-400 hover:text-gray-800 hover:bg-gray-100">
               <X className="w-5 h-5" />
             </button>
             <div>
-              <h3 className="text-xl font-black text-gray-900">{editingProduct ? 'Edit Product' : 'Sell New Product'}</h3>
-              <p className="text-xs text-gray-500 mt-0.5">Fill in product details and select your mandi location</p>
+              <h3 className="text-xl font-black text-gray-900">{editingProduct ? 'Edit Product & Images' : 'Sell New Product'}</h3>
+              <p className="text-xs text-gray-500 mt-0.5">Fill in product details, upload photos, and select your mandi location</p>
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-4">
+              {/* Product Images (Multi-Image Drag & Drop Manager) */}
+              <div className="p-4 bg-gray-50 rounded-2xl border border-gray-200">
+                <label className="block text-xs font-bold text-gray-800 mb-2">
+                  Product Images (Primary & Multi-Image Gallery)
+                </label>
+                <ProductImageManager
+                  productId={editingProduct ? editingProduct.id : null}
+                  images={formData.images || []}
+                  primaryImageUrl={formData.image_url || ''}
+                  isAdmin={false}
+                  onChange={({ images, primaryImageUrl }) => {
+                    setFormData(prev => ({
+                      ...prev,
+                      images,
+                      image_url: primaryImageUrl
+                    }));
+                  }}
+                />
+              </div>
               {/* Name */}
               <div>
                 <label className="block text-xs font-bold text-gray-700 mb-1">Product Name *</label>
@@ -294,21 +307,6 @@ export const MyProductsPage = () => {
                 </div>
               </div>
 
-              {/* Product Image Upload */}
-              <div>
-                <label className="block text-xs font-bold text-gray-700 mb-1">Product Image</label>
-                <div className="flex items-center space-x-3">
-                  {formData.image_url && (
-                    <img src={getImageUrl(formData.image_url)} alt="Preview" className="w-16 h-16 object-cover rounded-xl border"
-                      onError={(e) => { e.target.src = PRODUCT_FALLBACK; }} />
-                  )}
-                  <label className="cursor-pointer px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-xl text-xs font-bold text-gray-700 flex items-center space-x-1.5">
-                    <Upload className="w-3.5 h-3.5" />
-                    <span>Upload Image</span>
-                    <input type="file" accept=".jpg,.jpeg,.png,.webp" className="hidden" onChange={handleImageUpload} />
-                  </label>
-                </div>
-              </div>
 
               {/* Description */}
               <div>

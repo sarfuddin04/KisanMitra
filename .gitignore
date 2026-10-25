@@ -32,6 +32,10 @@ frontend/node_modules/
 frontend/dist/
 frontend/.env
 frontend/.env.local
+# Uploaded Files
+backend/storage/products/*
+!backend/storage/products/.gitkeep
+
 frontend/.env.production
 
 # ML Models (large files)

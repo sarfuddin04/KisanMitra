@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status, UploadFile, File, Form
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import func
 from typing import List, Optional, Dict, Any
@@ -1225,6 +1225,10 @@ def admin_list_products(
             "mandi_id": p.mandi_id,
             "mandi_name": p.mandi_name or (p.mandi.name if p.mandi else None),
             "image_url": primary_image,
+            "images": [
+                {"id": img.id, "image_url": img.image_url, "is_primary": img.is_primary, "display_order": img.display_order}
+                for img in sorted(p.images, key=lambda x: (not x.is_primary, x.display_order, x.id))
+            ] if p.images else [],
             "is_available": p.is_available,
             "is_organic": p.is_organic,
             "status": p.status,
@@ -1243,8 +1247,33 @@ def admin_get_product(product_id: int, db: Session = Depends(get_db)):
     ).filter(Product.id == product_id).first()
     if not p:
         raise HTTPException(status_code=404, detail="Product not found.")
-    return {"id": p.id, "name": p.name, "price": p.price, "unit": p.unit,
-            "status": p.status, "image_url": p.image_url}
+    return {
+        "id": p.id,
+        "name": p.name,
+        "description": p.description,
+        "price": p.price,
+        "unit": p.unit,
+        "stock_quantity": p.stock_quantity,
+        "location": p.location,
+        "category_id": p.category_id,
+        "category_name": p.category.name if p.category else None,
+        "seller_id": p.seller_id,
+        "seller_name": p.seller.full_name if p.seller else None,
+        "state_id": p.state_id,
+        "state_name": p.state_name,
+        "district_id": p.district_id,
+        "district_name": p.district_name,
+        "mandi_id": p.mandi_id,
+        "mandi_name": p.mandi_name,
+        "status": p.status,
+        "image_url": p.image_url,
+        "images": [
+            {"id": img.id, "image_url": img.image_url, "is_primary": img.is_primary, "display_order": img.display_order}
+            for img in sorted(p.images, key=lambda x: (not x.is_primary, x.display_order, x.id))
+        ] if p.images else [],
+        "is_available": p.is_available,
+        "is_organic": p.is_organic,
+    }
 
 
 @router.put("/products/{product_id}")
@@ -1319,23 +1348,203 @@ def admin_reject_product(product_id: int, db: Session = Depends(get_db)):
 def admin_get_product_images(product_id: int, db: Session = Depends(get_db)):
     from app.models.marketplace import ProductImage
     imgs = db.query(ProductImage).filter(ProductImage.product_id == product_id)\
-             .order_by(ProductImage.display_order).all()
+             .order_by(ProductImage.is_primary.desc(), ProductImage.display_order.asc(), ProductImage.id.asc()).all()
     return [{"id": i.id, "image_url": i.image_url, "is_primary": i.is_primary, "display_order": i.display_order} for i in imgs]
 
 
+@router.post("/products/{product_id}/images/upload")
+async def admin_upload_product_image(
+    product_id: int,
+    file: UploadFile = File(...),
+    is_primary: bool = Form(False),
+    db: Session = Depends(get_db)
+):
+    """Admin upload product image file directly to persistent storage."""
+    import os, uuid
+    from app.core.config import settings
+    from app.models.marketplace import ProductImage
+
+    p = db.query(Product).options(joinedload(Product.images)).filter(Product.id == product_id).first()
+    if not p:
+        raise HTTPException(status_code=404, detail="Product not found.")
+
+    content = await file.read()
+    if len(content) == 0:
+        raise HTTPException(status_code=400, detail="Uploaded file is empty.")
+    if len(content) > 5 * 1024 * 1024:
+        raise HTTPException(status_code=413, detail="Image exceeds 5 MB limit.")
+
+    content_type = (file.content_type or "").lower().strip()
+    ext_map = {"image/jpeg": "jpg", "image/jpg": "jpg", "image/png": "png", "image/webp": "webp"}
+    ext = ext_map.get(content_type, "jpg")
+
+    products_dir = os.path.join(settings.UPLOAD_DIR, "products")
+    os.makedirs(products_dir, exist_ok=True)
+    filename = f"{uuid.uuid4().hex}.{ext}"
+    file_path = os.path.join(products_dir, filename)
+
+    with open(file_path, "wb") as f:
+        f.write(content)
+
+    static_url = f"/api/static/products/{filename}"
+
+    existing_count = len(p.images)
+    should_be_primary = is_primary or (existing_count == 0) or (not p.image_url)
+
+    if should_be_primary:
+        db.query(ProductImage).filter(ProductImage.product_id == product_id).update({"is_primary": False})
+        p.image_url = static_url
+
+    img = ProductImage(
+        product_id=product_id,
+        image_url=static_url,
+        is_primary=should_be_primary,
+        display_order=existing_count
+    )
+    db.add(img)
+    db.commit()
+    db.refresh(img)
+    db.refresh(p)
+    return {"message": "Image uploaded successfully.", "id": img.id, "image_url": img.image_url, "product": _admin_product_to_dict(p)}
+
+
 @router.post("/products/{product_id}/images")
-def admin_add_product_image(product_id: int, image_url: str, is_primary: bool = False, db: Session = Depends(get_db)):
+def admin_add_product_image(
+    product_id: int,
+    req: dict = None,
+    image_url: Optional[str] = None,
+    is_primary: bool = False,
+    db: Session = Depends(get_db)
+):
+    """Add image by URL or JSON body."""
+    from app.models.marketplace import ProductImage
+    p = db.query(Product).options(joinedload(Product.images)).filter(Product.id == product_id).first()
+    if not p:
+        raise HTTPException(status_code=404, detail="Product not found.")
+
+    url = (req.get("image_url") if isinstance(req, dict) else None) or image_url
+    if not url:
+        raise HTTPException(status_code=400, detail="image_url is required.")
+
+    primary_flag = (req.get("is_primary") if isinstance(req, dict) and "is_primary" in req else is_primary)
+    existing_count = len(p.images)
+    should_be_primary = primary_flag or (existing_count == 0) or (not p.image_url)
+
+    if should_be_primary:
+        db.query(ProductImage).filter(ProductImage.product_id == product_id).update({"is_primary": False})
+        p.image_url = url
+
+    img = ProductImage(product_id=product_id, image_url=url, is_primary=should_be_primary, display_order=existing_count)
+    db.add(img)
+    db.commit()
+    db.refresh(img)
+    db.refresh(p)
+    return {"message": "Image added.", "id": img.id, "image_url": url, "product": _admin_product_to_dict(p)}
+
+
+@router.put("/products/{product_id}/images/{image_id}/primary")
+def admin_set_primary_image(product_id: int, image_id: int, db: Session = Depends(get_db)):
     from app.models.marketplace import ProductImage
     p = db.query(Product).filter(Product.id == product_id).first()
     if not p:
         raise HTTPException(status_code=404, detail="Product not found.")
-    if is_primary:
-        db.query(ProductImage).filter(ProductImage.product_id == product_id).update({"is_primary": False})
-        p.image_url = image_url
-    img = ProductImage(product_id=product_id, image_url=image_url, is_primary=is_primary)
-    db.add(img)
+
+    target = db.query(ProductImage).filter(ProductImage.id == image_id, ProductImage.product_id == product_id).first()
+    if not target:
+        raise HTTPException(status_code=404, detail="Image not found on this product.")
+
+    db.query(ProductImage).filter(ProductImage.product_id == product_id).update({"is_primary": False})
+    target.is_primary = True
+    p.image_url = target.image_url
     db.commit()
-    return {"message": "Image added.", "id": img.id, "image_url": image_url}
+    db.refresh(p)
+    return {"message": "Primary image set.", "image_url": p.image_url, "product": _admin_product_to_dict(p)}
+
+
+@router.put("/products/{product_id}/images/reorder")
+def admin_reorder_product_images(product_id: int, req: dict, db: Session = Depends(get_db)):
+    from app.models.marketplace import ProductImage
+    image_ids = req.get("image_ids", [])
+    for order, img_id in enumerate(image_ids):
+        db.query(ProductImage).filter(ProductImage.id == img_id, ProductImage.product_id == product_id).update({"display_order": order})
+    db.commit()
+    return admin_get_product_images(product_id=product_id, db=db)
+
+
+@router.put("/products/{product_id}/images/{image_id}/replace")
+async def admin_replace_product_image(
+    product_id: int,
+    image_id: int,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db)
+):
+    """Replace an existing product image with a new uploaded file."""
+    import os, uuid
+    from app.core.config import settings
+    from app.models.marketplace import ProductImage
+
+    p = db.query(Product).filter(Product.id == product_id).first()
+    if not p:
+        raise HTTPException(status_code=404, detail="Product not found.")
+
+    target = db.query(ProductImage).filter(ProductImage.id == image_id, ProductImage.product_id == product_id).first()
+    if not target:
+        raise HTTPException(status_code=404, detail="Image not found.")
+
+    content = await file.read()
+    if len(content) == 0:
+        raise HTTPException(status_code=400, detail="Uploaded file is empty.")
+
+    content_type = (file.content_type or "").lower().strip()
+    ext_map = {"image/jpeg": "jpg", "image/jpg": "jpg", "image/png": "png", "image/webp": "webp"}
+    ext = ext_map.get(content_type, "jpg")
+
+    products_dir = os.path.join(settings.UPLOAD_DIR, "products")
+    os.makedirs(products_dir, exist_ok=True)
+    filename = f"{uuid.uuid4().hex}.{ext}"
+    file_path = os.path.join(products_dir, filename)
+
+    with open(file_path, "wb") as f:
+        f.write(content)
+
+    new_url = f"/api/static/products/{filename}"
+    old_url = target.image_url
+    target.image_url = new_url
+    if target.is_primary or p.image_url == old_url:
+        p.image_url = new_url
+
+    db.commit()
+    db.refresh(target)
+    db.refresh(p)
+    return {"message": "Image replaced.", "image_url": new_url, "product": _admin_product_to_dict(p)}
+
+
+@router.delete("/products/{product_id}/images/{image_id}")
+def admin_delete_product_image_by_product(product_id: int, image_id: int, db: Session = Depends(get_db)):
+    from app.models.marketplace import ProductImage
+    p = db.query(Product).filter(Product.id == product_id).first()
+    img = db.query(ProductImage).filter(ProductImage.id == image_id, ProductImage.product_id == product_id).first()
+    if not img:
+        raise HTTPException(status_code=404, detail="Image not found.")
+
+    was_primary = img.is_primary
+    old_url = img.image_url
+    db.delete(img)
+    db.flush()
+
+    if was_primary or (p and p.image_url == old_url):
+        remaining = db.query(ProductImage).filter(ProductImage.product_id == product_id).order_by(ProductImage.display_order.asc()).first()
+        if remaining:
+            remaining.is_primary = True
+            if p: p.image_url = remaining.image_url
+        else:
+            if p: p.image_url = None
+
+    db.commit()
+    if p:
+        db.refresh(p)
+        return {"message": "Image deleted.", "product": _admin_product_to_dict(p)}
+    return {"message": "Image deleted."}
 
 
 @router.delete("/product-images/{image_id}")
@@ -1344,9 +1553,8 @@ def admin_delete_product_image(image_id: int, db: Session = Depends(get_db)):
     img = db.query(ProductImage).filter(ProductImage.id == image_id).first()
     if not img:
         raise HTTPException(status_code=404, detail="Image not found.")
-    db.delete(img)
-    db.commit()
-    return {"message": "Image deleted."}
+    prod_id = img.product_id
+    return admin_delete_product_image_by_product(product_id=prod_id, image_id=image_id, db=db)
 
 
 # ==================== 24. ADMIN LOCATION MANAGEMENT ====================

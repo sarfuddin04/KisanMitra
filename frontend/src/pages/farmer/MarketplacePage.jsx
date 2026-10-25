@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { ShoppingCart, Search, Filter, MapPin, Tag, Package, Plus, Eye, Heart, X, ChevronDown } from 'lucide-react';
+import { ShoppingCart, Search, Filter, MapPin, Tag, Package, Plus, Eye, Heart, X, ChevronDown, Layers } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import api from '../../services/api';
+import { getDisplayUrl } from '../../components/ProductImageManager';
 
 const PRODUCT_FALLBACK = 'https://images.unsplash.com/photo-1574943320219-553eb213f72d?w=400&q=80';
 
@@ -95,10 +96,7 @@ export const MarketplacePage = () => {
   };
 
   const getImageUrl = (product) => {
-    if (product.image_url) {
-      return product.image_url.startsWith('http') ? product.image_url : `/api/static/${product.image_url}`;
-    }
-    return PRODUCT_FALLBACK;
+    return getDisplayUrl(product?.image_url);
   };
 
   const formatPrice = (price) => {
@@ -217,6 +215,11 @@ export const MarketplacePage = () => {
                 }`}>
                   {p.is_available ? '✓ Available' : 'Out of Stock'}
                 </span>
+                {p.images && p.images.length > 1 && (
+                  <span className="absolute bottom-2.5 right-2.5 bg-black/75 text-white text-[10px] font-bold px-2 py-0.5 rounded-md flex items-center gap-1 backdrop-blur-xs shadow">
+                    <Layers className="w-3 h-3 text-emerald-400" /> {p.images.length}
+                  </span>
+                )}
               </div>
 
               {/* Content */}

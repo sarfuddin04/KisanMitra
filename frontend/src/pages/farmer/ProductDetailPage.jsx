@@ -2,19 +2,14 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import {
   ArrowLeft, ShoppingCart, Star, MapPin, Leaf, Package, User, Phone,
-  Tag, Box, TrendingUp, Shield, ChevronRight, AlertTriangle, Loader2
+  Tag, Box, TrendingUp, Shield, ChevronRight, ChevronLeft, AlertTriangle,
+  Loader2, ZoomIn, X, Eye
 } from 'lucide-react';
 import api from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
+import { getDisplayUrl } from '../../components/ProductImageManager';
 
 const FALLBACK_IMAGE = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='600' height='400' viewBox='0 0 600 400'%3E%3Crect width='600' height='400' fill='%23f0fdf4'/%3E%3Ctext x='300' y='200' text-anchor='middle' font-family='Inter,Arial,sans-serif' font-size='18' fill='%2322c55e'%3E🌾 Product Image%3C/text%3E%3C/svg%3E";
-
-const getImageUrl = (url) => {
-  if (!url) return FALLBACK_IMAGE;
-  if (url.startsWith('http') || url.startsWith('data:')) return url;
-  const base = (import.meta.env.VITE_API_URL || 'http://localhost:8000').replace('/api', '');
-  return `${base}${url}`;
-};
 
 export const ProductDetailPage = () => {
   const { id } = useParams();
@@ -27,6 +22,7 @@ export const ProductDetailPage = () => {
   const [selectedImage, setSelectedImage] = useState(0);
   const [addingToCart, setAddingToCart] = useState(false);
   const [cartSuccess, setCartSuccess] = useState('');
+  const [isZoomOpen, setIsZoomOpen] = useState(false);
 
   useEffect(() => {
     fetchProduct();
@@ -82,7 +78,12 @@ export const ProductDetailPage = () => {
     const imgs = [];
     if (product.image_url) imgs.push(product.image_url);
     if (product.images && product.images.length > 0) {
-      product.images.forEach(img => {
+      const sorted = [...product.images].sort((a, b) => {
+        if (a.is_primary && !b.is_primary) return -1;
+        if (!a.is_primary && b.is_primary) return 1;
+        return (a.display_order ?? 0) - (b.display_order ?? 0);
+      });
+      sorted.forEach(img => {
         if (img.image_url && !imgs.includes(img.image_url)) {
           imgs.push(img.image_url);
         }
@@ -118,9 +119,45 @@ export const ProductDetailPage = () => {
   }
 
   const gallery = getGalleryImages();
+  const currentImg = gallery[selectedImage] || gallery[0] || FALLBACK_IMAGE;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-emerald-50/60 via-white to-lime-50/40">
+      {/* Zoom / Lightbox Modal */}
+      {isZoomOpen && (
+        <div className="fixed inset-0 z-50 bg-black/90 backdrop-blur-md flex items-center justify-center p-4" onClick={() => setIsZoomOpen(false)}>
+          <div className="relative max-w-4xl w-full max-h-[90vh] flex flex-col items-center" onClick={e => e.stopPropagation()}>
+            <button
+              onClick={() => setIsZoomOpen(false)}
+              className="absolute -top-12 right-0 p-2 text-white/80 hover:text-white bg-white/10 hover:bg-white/20 rounded-full transition-colors"
+            >
+              <X className="w-6 h-6" />
+            </button>
+            <img
+              src={getDisplayUrl(currentImg)}
+              alt={product.name}
+              className="max-h-[80vh] w-auto max-w-full object-contain rounded-2xl shadow-2xl"
+              onError={e => { e.target.src = FALLBACK_IMAGE; }}
+            />
+            {gallery.length > 1 && (
+              <div className="flex gap-2 mt-4 overflow-x-auto p-2 bg-black/40 rounded-full backdrop-blur-xs">
+                {gallery.map((img, idx) => (
+                  <button
+                    key={idx}
+                    onClick={() => setSelectedImage(idx)}
+                    className={`w-12 h-12 rounded-lg overflow-hidden border-2 transition-all ${
+                      selectedImage === idx ? 'border-emerald-400 scale-105' : 'border-transparent opacity-60 hover:opacity-100'
+                    }`}
+                  >
+                    <img src={getDisplayUrl(img)} alt="thumb" className="w-full h-full object-cover" />
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Breadcrumb */}
       <div className="max-w-6xl mx-auto px-4 pt-6 pb-2">
         <nav className="flex items-center gap-2 text-sm text-gray-500">
@@ -146,13 +183,51 @@ export const ProductDetailPage = () => {
             {/* Left — Image Gallery */}
             <div className="p-6 lg:p-8 bg-gradient-to-br from-gray-50 to-emerald-50/30">
               {/* Main image */}
-              <div className="relative rounded-2xl overflow-hidden bg-white shadow-sm border border-gray-100 aspect-[4/3]">
+              <div className="relative rounded-2xl overflow-hidden bg-white shadow-sm border border-gray-100 aspect-[4/3] group">
                 <img
-                  src={getImageUrl(gallery[selectedImage])}
+                  src={getDisplayUrl(currentImg)}
                   alt={product.name}
-                  className="w-full h-full object-cover"
+                  className="w-full h-full object-cover cursor-zoom-in group-hover:scale-102 transition-transform duration-300"
+                  onClick={() => setIsZoomOpen(true)}
                   onError={(e) => { e.target.src = FALLBACK_IMAGE; }}
                 />
+                <button
+                  type="button"
+                  onClick={() => setIsZoomOpen(true)}
+                  className="absolute bottom-3 right-3 p-2 bg-black/60 hover:bg-black/80 text-white rounded-xl backdrop-blur-xs opacity-0 group-hover:opacity-100 transition-opacity"
+                  title="Enlarge Image"
+                >
+                  <ZoomIn className="w-4 h-4" />
+                </button>
+
+                {gallery.length > 1 && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedImage((prev) => (prev - 1 + gallery.length) % gallery.length);
+                      }}
+                      className="absolute left-2.5 top-1/2 -translate-y-1/2 p-2 rounded-full bg-white/80 hover:bg-white text-gray-800 shadow-md backdrop-blur-xs transition-transform active:scale-90"
+                    >
+                      <ChevronLeft className="w-4 h-4" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedImage((prev) => (prev + 1) % gallery.length);
+                      }}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 p-2 rounded-full bg-white/80 hover:bg-white text-gray-800 shadow-md backdrop-blur-xs transition-transform active:scale-90"
+                    >
+                      <ChevronRight className="w-4 h-4" />
+                    </button>
+                    <span className="absolute bottom-3 left-3 px-2 py-0.5 bg-black/60 text-white text-[10px] font-bold rounded-md backdrop-blur-xs">
+                      {selectedImage + 1} / {gallery.length}
+                    </span>
+                  </>
+                )}
+
                 {product.is_organic && (
                   <div className="absolute top-3 left-3 flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600/90 backdrop-blur-sm text-white text-xs font-bold rounded-full shadow">
                     <Leaf className="w-3.5 h-3.5" /> Organic
@@ -177,7 +252,7 @@ export const ProductDetailPage = () => {
                       }`}
                     >
                       <img
-                        src={getImageUrl(img)}
+                        src={getDisplayUrl(img)}
                         alt={`View ${idx + 1}`}
                         className="w-full h-full object-cover"
                         onError={(e) => { e.target.src = FALLBACK_IMAGE; }}
